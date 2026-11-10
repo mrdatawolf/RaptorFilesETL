@@ -1,0 +1,24 @@
+# Secrets and local configuration (see docs/PROJECT.md: config via env vars)
+.env
+.env.*
+!.env.example
+
+# Real report files from the plant share - never commit production data
+Samples/
+
+# Local SQLite databases (bronze output)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Personal Claude Code settings (shared settings.json stays tracked)
+.claude/settings.local.json
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
