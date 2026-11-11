@@ -130,11 +130,17 @@ parser raises `LayoutError`, naming the file and the check that failed.
   `Production ToDate Report`.
 - Every header label the type needs is present: "Printed:", plus
   "Report Start:", "Report End:" and "Recipe:" for the two summary reports.
-- The column or section headers the type needs appear before the first data
-  record. Downtime: `Alarm ID`, `Alarm Description:`, `Details (hh:mm:ss)`.
-  Production Summary: the KPI labels and the four section titles (`Product
-  Summary`, `Length Summary`, `Grade Summary`, `Width Summary`). ToDate: all
-  10 column labels.
+- The column or section headers the type needs are present before the data
+  they label:
+  - Downtime: `Alarm ID`, `Alarm Description:` and `Details (hh:mm:ss)`
+    appear before the first alarm record.
+  - Production Summary: the KPI labels appear before the KPI values, and each
+    of the four section titles (`Product Summary`, `Length Summary`,
+    `Grade Summary`, `Width Summary`) appears before **that section's** first
+    record. The titles do not all have to come before the first record. In
+    `Samples/`, `Width Summary` first appears on row 49, after the other
+    sections' records start on row 28.
+  - ToDate: all 10 column labels appear before the first data row.
 - A "Page N of N" marker is present.
 
 ## Required behavior
@@ -200,6 +206,13 @@ or file writes.
 - Passing the wrong type (for example a Downtime file declared as Production
   Summary) raises `LayoutError`.
 - A non-`.xls` file raises `LayoutError`.
+
+## Amendments
+
+- 2026-11-11 (approved by Patrick): the Production Summary header
+  precondition changed from "all section titles before the first data
+  record" to "each section title before that section's first record". The
+  original wording rejected the sample file. Found during TASK-003.
 
 ## Open questions
 

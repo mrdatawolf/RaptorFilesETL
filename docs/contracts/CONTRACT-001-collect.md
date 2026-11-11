@@ -66,8 +66,13 @@ collecting.
 - `RAPTOR_ARCHIVE_DIR` exists and is writable. Otherwise: exit code 2.
 - No other run holds the run lock. Otherwise: exit code 3, nothing done.
 
-The share being unreachable is **not** a precondition failure. See Failure
-behavior.
+- The source is reachable: for SMB, the login succeeds and the source folder
+  can be listed; for a local source, the folder exists and can be listed.
+  Otherwise: the reason is logged (never the password), **the run stops
+  before collecting or loading**, and the exit code is 4.
+
+These checks are the run's **precheck**. `raptor-etl check` runs the same
+precheck code without collecting (see Interfaces).
 
 ## Required behavior
 
@@ -113,7 +118,7 @@ and a short hash.
 
 | Situation | Behavior |
 |---|---|
-| Share unreachable or login fails | All 8 files are `failed` with the reason logged. The run continues to the load stage. Exit code 1. |
+| Share unreachable or login fails | Precheck failure. The run stops before collecting or loading, logs the reason and exits with code 4. Nothing is archived or loaded. Earlier failed loads are retried on the next run whose precheck passes. |
 | Expected file missing | That file is `missing`. Others continue. Exit code 1. |
 | Read or write error on one file | That file is `failed` and its temporary file is removed. Others continue. Exit code 1. |
 | Archive name exists with different content | `failed`, nothing overwritten. Others continue. Exit code 1. Needs a person to resolve it. |
@@ -127,7 +132,13 @@ The SMB password never appears in logs or error messages.
   `0` = every file `archived` or `unchanged` and every load succeeded;
   `1` = at least one file `missing` or `failed`, or a load failed;
   `2` = invalid configuration or unusable archive folder;
-  `3` = another run in progress.
+  `3` = another run in progress;
+  `4` = source unreachable or login failed (precheck), nothing done.
+- `raptor-etl check`: runs the precheck read-only (no lock, no writes), then
+  reports each expected file as present or absent, with its size, and reads
+  it in full to report its SHA-256. Exit codes: `0` all OK, `1` any file
+  absent or unreadable, `2` invalid configuration, `4` source unreachable or
+  login failed.
 - Collect writes only to `RAPTOR_ARCHIVE_DIR` and the `archived_file` table.
 
 ## Validation requirements
@@ -149,8 +160,21 @@ Automated tests against a local source folder holding copies of `Samples/`:
 - Copy date follows `RAPTOR_TIMEZONE`, not the host's time zone (test with
   an injected clock at 23:30 Pacific = 07:30 UTC the next day).
 - A second concurrent run exits with 3.
+- Source unreachable or login failure → exit code 4, no archive files, no
+  `archived_file` records, and the load stage is not called.
+- `raptor-etl check` writes nothing and takes no lock, and it reports the
+  same precheck result as `run`.
 
 Manual: one run against the real SMB share before deployment.
+
+## Amendments
+
+- 2026-11-11 (approved by Patrick): an unreachable source or failed login is
+  now a precondition failure that stops the whole run with exit code 4,
+  instead of marking all 8 files `failed` and continuing to load. This lets
+  the same precheck run everywhere, by hand with `raptor-etl check` and
+  automatically at the start of every run. Comparing a test box with the
+  container then shows whether a problem is the share or the container.
 
 ## Open questions
 

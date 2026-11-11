@@ -8,7 +8,7 @@ Approved by:
 Approved date:
 Related contracts: CONTRACT-001
 Related ADRs: ADR-001
-Dependencies: TASK-002 (TASK-005 for a meaningful container run)
+Dependencies: TASK-002, TASK-007 (TASK-005 for a meaningful container run)
 
 ## Desired outcome
 
@@ -29,6 +29,10 @@ cron library, no catch-up of missed runs, logs to stdout.
 - Next-run calculation in plant time, correct across DST changes; sleep
   until then; run; repeat. A failed run is logged and the loop continues.
 - Clean shutdown on SIGTERM.
+- Startup connection check: when `schedule` starts, it runs the TASK-007
+  check once and logs the result. A failure is logged as a warning and the
+  scheduler keeps running, because the next scheduled `run` handles and logs
+  the failure per CONTRACT-001.
 - `Dockerfile` (slim Python 3.12 base, non-root user, `raptor-etl schedule`
   entry point, archive and DB paths as volumes) and `.dockerignore`
   excluding `.env`, `Samples/`, databases.
@@ -50,6 +54,7 @@ cron library, no catch-up of missed runs, logs to stdout.
 - [ ] Next-run tests with an injected clock: weekday 22:59 → same day 23:00; Friday 23:01 → Monday 23:00; across both DST transitions.
 - [ ] Invalid schedule variables → exit code 2.
 - [ ] SIGTERM stops the loop cleanly.
+- [ ] On startup, `schedule` logs the connection check result, and a failing check does not stop the scheduler.
 - [ ] `docker build` succeeds and the image contains no `.env`, `Samples/` or database files.
 
 ## Validation requirements

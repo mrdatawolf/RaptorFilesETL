@@ -49,7 +49,8 @@ raptor-etl schedule                # long-running scheduler (Docker entry point)
 
 Exit codes for `raptor-etl run` (CONTRACT-001):
 `0` success, `1` at least one file missing or failed, `2` invalid
-configuration or unusable archive or database, `3` another run in progress.
+configuration or unusable archive or database, `3` another run in progress,
+`4` source unreachable or login failed (precheck), nothing done.
 
 ## Configuration
 

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raptor-etl"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["xlrd>=2,<3", "smbprotocol", "python-dotenv", "tzdata", "icontract"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+raptor-etl = "raptor_etl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

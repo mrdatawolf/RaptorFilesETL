@@ -69,7 +69,95 @@ None.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-004 — Collect report files into the dated archive
+Implementer: Codex (openai-coder)
+Date: 2026-11-11
+
+### Changes made
+
+- Added `src/raptor_etl/source.py`: read-only local and SMB source implementations,
+  selected from the configured path prefix. SMB uses `smbclient` directly,
+  with optional domain-qualified username and sanitized exception messages.
+- Added `src/raptor_etl/collect.py`: the eight case-sensitive expected names in
+  contract order, one plant-local copy date per run, streamed SHA-256 copy,
+  verification, atomic rename, transactional `archived_file` insert,
+  deduplication, interrupted-run recovery, conflict protection, per-file
+  outcomes/logging, and stale partial cleanup (including earlier dates).
+- Connected collect to the existing CLI stage hook. Missing/failed outcomes
+  contribute exit code 1 while still calling load.
+- Added `tests/test_collect.py`. Updated two foundation CLI expectations that
+  assumed the placeholder succeeded despite a nonexistent source folder.
+  No parser modules/tests or database schema were changed.
+
+### Validation performed
+
+- `.venv/bin/pytest tests/test_collect.py -q`: 15 passed, 0 failed, 0 skipped
+  (initial tests).
+- `.venv/bin/pytest -q`: 53 passed, 2 failed, 0 skipped initially. Both failures
+  were obsolete placeholder expectations for a nonexistent source; updated
+  those expectations to the contract's exit code 1.
+- `.venv/bin/pytest tests/test_collect.py tests/test_cli_lock.py -q`:
+  25 passed, 0 failed, 0 skipped after adding streaming faults and CLI success.
+- `.venv/bin/pytest`: 57 passed, 0 failed, 0 skipped (40 foundation tests plus
+  17 collect tests). Samples were available. No real network calls were made.
+
+### Acceptance criteria evidence
+
+- Tests cover first archive, identical rerun, one changed file on a later day,
+  missing/case-mismatched source, ignored extra files, conflicting archive,
+  record recovery, stale partials, read/write/hash/database failures and retry,
+  unavailable source, CLI success/failure, and load-stage visibility.
+- Collection attempts compare temporary source file SHA-256 and nanosecond mtime
+  before/after; CLI integration also checks source preservation. Tests use
+  temporary copies of `Samples/` and skip clearly if it is absent.
+- Injected 07:30 UTC produces the previous day's 23:30 Pacific copy date;
+  a midnight-crossing provider is sampled exactly once.
+- Mocked SMB tests cover both path prefixes, credentials/domain, binary read-only
+  access, sanitized login/read exceptions, and all-eight-failed login behavior
+  with the load hook still called. Password canaries do not appear in output.
+- Concurrent CLI run returns 3 without collecting; existing subprocess lock and
+  process-death tests also pass.
+
+### Assumptions and deviations
+
+- The answered no-production question is applied: byte-identical source files
+  are unchanged regardless of the current copy date.
+- Collect runs under the foundation run lock, which serializes application
+  archive writers. Existing archives are checked before rename and never
+  intentionally replaced. External writers must not modify the archive.
+- A database failure after rename leaves the verified final file for the
+  contract's interrupted-run recovery on a subsequent run; no archive is deleted.
+- Direct task instructions take precedence over lifecycle guidance: this file
+  remains in `tasks/in-progress/`; Review and acceptance are untouched.
+- Automated SMB coverage uses mocks as explicitly requested; no live SMB test
+  was performed. No behavior or schema deviations.
+
+### Unresolved risks
+
+Manual SMB validation is required before deployment. Procedure:
+
+1. Use an account with read-only access to the real report share. Supply
+   `RAPTOR_SOURCE_PATH`, `RAPTOR_SMB_USERNAME`, `RAPTOR_SMB_PASSWORD`, optional
+   `RAPTOR_SMB_DOMAIN`, and `RAPTOR_TIMEZONE` through the environment or a
+   gitignored `.env`; never paste credentials into commands or reports.
+2. Set `RAPTOR_ARCHIVE_DIR` to an existing writable, empty test archive and
+   `RAPTOR_DB_PATH` to a fresh test database with an existing parent directory.
+   Record source hashes and modification times using authorized read-only tools.
+3. Run `.venv/bin/raptor-etl run`. Confirm eight `archived` outcomes, plant-local
+   dated names, matching SHA-256/size values and eight `archived_file` rows.
+   Confirm source hashes/mtimes are unchanged and no partials remain.
+4. Run again before source content changes: expect eight `unchanged` outcomes
+   and no additional archive files or database records. Confirm logs contain
+   no password. Retain test archives according to the contract.
+5. Optionally use deliberately invalid test credentials and confirm eight
+   sanitized `failed` outcomes and exit code 1. The automated test verifies
+   continuation to load; loading itself remains TASK-005.
+
+Real SMB permissions, server availability and behavior await that manual check.
+
+### Documentation updated
+
+This implementation handoff only. Contract/ADR behavior remains unchanged.
 
 ## Review
 

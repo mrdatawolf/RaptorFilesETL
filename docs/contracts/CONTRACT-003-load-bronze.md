@@ -122,7 +122,8 @@ Foreign keys are enabled on every connection.
 
 - Configuration is valid and the database is usable, meaning it opens and
   its schema version is known or upgradable. Otherwise: exit code 2.
-- The run holds the run lock (CONTRACT-001).
+- The run holds the run lock and the CONTRACT-001 precheck passed. If the
+  source is unreachable, the run stops before loading (exit code 4).
 
 ## Required behavior
 
@@ -132,7 +133,8 @@ Foreign keys are enabled on every connection.
    - and has no `file_load` row.
 
    This includes files archived in earlier runs whose load failed, so
-   failures are retried automatically on every run. PDFs and Thickness
+   failures are retried automatically on every run that passes the
+   CONTRACT-001 precheck. PDFs and Thickness
    Breakdown are never selected. They are processed in `archived_at` order,
    oldest first.
 2. **For each file:**
