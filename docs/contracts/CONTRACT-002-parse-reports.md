@@ -1,6 +1,6 @@
 # CONTRACT-002: Parse Raptor `.xls` reports
 
-Status: Proposed
+Status: Approved
 Approved by: Patrick
 Approved date: 2026-11-11
 Related tasks: TASK-001

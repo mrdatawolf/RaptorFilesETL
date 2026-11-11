@@ -1,6 +1,6 @@
 # CONTRACT-001: Collect report files into the dated archive
 
-Status: Proposed
+Status: Approved
 Approved by: Patrick
 Approved date: 2026-11-11
 Related tasks: TASK-001
