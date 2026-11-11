@@ -105,7 +105,82 @@ None.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-001
+Implementer: Claude
+Date: 2026-11-10
+
+### Changes made
+
+All new documents have status **Proposed** and are waiting for human approval:
+
+- `docs/decisions/ADR-001-technology-stack-and-runtime.md`
+- `docs/contracts/CONTRACT-001-collect.md`
+- `docs/contracts/CONTRACT-002-parse-reports.md`
+- `docs/contracts/CONTRACT-003-load-bronze.md`
+
+No application code was written.
+
+### Validation performed
+
+- Inspected all `Samples/` files. The PDFs were read with `pdftotext`. The
+  `.xls` files were converted with `ssconvert` to CSV and XLSX in a scratch
+  directory outside the repo, to read values and raw cell types.
+- Checked every invariant in CONTRACT-002 against `Samples/`, and all hold:
+  - Downtime: 20 alarms add up to the Grand Total of 380 occurrences and
+    01:49:49.
+  - Production Summary: product, length, grade and width pieces each add up
+    to the section Total of 58,004.
+  - Production ToDate: 81 rows, all with unique `run_start`.
+- Confirmed that dates are stored as Excel serial numbers and durations as
+  text.
+
+### Acceptance criteria evidence
+
+- Criterion 1: ADR-001 is drafted. Approving it and updating
+  `docs/DEVELOPMENT.md` are human or follow-up steps; `DEVELOPMENT.md`
+  should be updated only after approval, as the ADR says.
+- Criterion 2: the contracts are drafted. Each has sections for
+  preconditions, required behavior, postconditions and invariants, and
+  failure behavior. Approval is pending.
+- Criterion 3: each contract's validation section lists tests using
+  `Samples/`, with expected values.
+
+### Assumptions and deviations
+
+- No deviations from scope.
+- Data findings that shaped the contracts:
+  - Column positions shift between pages, so values must be found by label,
+    not by position.
+  - ToDate has a blank cell (2026-09-23, Slow %), so value columns can be
+    null.
+  - ToDate has two runs on 2026-09-16, so rows are keyed by start time, not
+    by date.
+  - "Page N of N" appears only once in the `.xls` export, so page
+    completeness can't be checked.
+- Design choices made within scope; challenge any of these at approval:
+  - The scheduler runs inside the container.
+  - SMB is read directly over the network rather than mounted.
+  - icontract is used for program contracts, and explicit errors for bad
+    input.
+  - The archive is a single flat folder.
+  - If an archive name already exists with different content, that file
+    fails. It is never overwritten.
+  - Failed loads are retried automatically on every run.
+  - Lineage and load bookkeeping tables live in the bronze database.
+  - Durations are stored as text, exactly as shown in the report.
+
+### Unresolved risks
+
+- CONTRACT-001 open question: the files on a no-production weekday may not
+  be byte-identical to the previous day's. If they aren't, they will be
+  archived and loaded again. To check against real share behavior.
+- A run missed while the container is down cannot be caught up later
+  (ADR-001).
+
+### Documentation updated
+
+The new ADR and contracts above. `docs/DEVELOPMENT.md` is deliberately
+unchanged until ADR-001 is approved.
 
 ## Review
 

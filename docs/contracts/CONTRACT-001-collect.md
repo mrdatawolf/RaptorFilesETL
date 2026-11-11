@@ -1,8 +1,8 @@
 # CONTRACT-001: Collect report files into the dated archive
 
 Status: Proposed
-Approved by:
-Approved date:
+Approved by: Patrick
+Approved date: 2026-11-11
 Related tasks: TASK-001
 Related ADRs: ADR-001
 
@@ -159,3 +159,4 @@ Manual: one run against the real SMB share before deployment.
    byte-identical. If Raptor regenerates them, for example with a new Printed
    time, their hashes will differ and they will be archived and loaded again.
    To check: compare two days' files around a no-production weekday.
+ - Yes

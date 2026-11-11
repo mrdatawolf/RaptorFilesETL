@@ -1,8 +1,8 @@
 # CONTRACT-002: Parse Raptor `.xls` reports
 
 Status: Proposed
-Approved by:
-Approved date:
+Approved by: Patrick
+Approved date: 2026-11-11
 Related tasks: TASK-001
 Related ADRs: ADR-001
 
