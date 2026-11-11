@@ -1,7 +1,9 @@
 # ADR-001: Technology stack and runtime
 
-Status: Proposed
+Status: Approved
 Date: 2026-11-10
+Approved by: Patrick
+Approved date: 2026-11-11
 Decision owners: Patrick
 Related tasks and contracts: TASK-001, CONTRACT-001, CONTRACT-002, CONTRACT-003
 
