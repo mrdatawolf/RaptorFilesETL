@@ -4,8 +4,8 @@ Owner role: implementer
 Assigned agent: Codex (openai-coder)
 Proposed by: Claude (main session)
 Proposed date: 2026-11-11
-Approved by:
-Approved date:
+Approved by: Patrick
+Approved date: 2026-11-11
 Related contracts: CONTRACT-003, CONTRACT-001 (exit codes)
 Related ADRs: ADR-001
 Dependencies: TASK-002, TASK-003, TASK-004
