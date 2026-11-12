@@ -42,7 +42,7 @@ class Config:
     smb_domain: str | None = field(repr=False)
 
 
-def load_config(env_file: str | Path = ".env") -> Config:
+def load_config(env_file: str | Path = ".env", *, read_only: bool = False) -> Config:
     load_dotenv(env_file, override=False, interpolate=False)
     problems = []
 
@@ -85,8 +85,12 @@ def load_config(env_file: str | Path = ".env") -> Config:
         problems.append("RAPTOR_LOG_LEVEL: expected DEBUG, INFO, WARNING or ERROR")
     if archive:
         try:
-            with tempfile.TemporaryFile(dir=archive):
-                pass
+            if read_only:
+                if not Path(archive).is_dir() or not os.access(archive, os.W_OK | os.X_OK):
+                    raise OSError
+            else:
+                with tempfile.TemporaryFile(dir=archive):
+                    pass
         except (OSError, ValueError):
             problems.append("RAPTOR_ARCHIVE_DIR: must exist and be writable")
     if database:

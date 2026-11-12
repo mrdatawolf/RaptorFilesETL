@@ -80,6 +80,7 @@ def test_report_uniques_foreign_keys_and_not_null(tmp_path, table, values):
 
 
 def test_newer_no_writes(configured):
+    (configured / "source").mkdir()
     path = configured / 'bronze.db'
     db = sqlite3.connect(path)
     db.execute(f'PRAGMA user_version={CURRENT_VERSION + 1}')

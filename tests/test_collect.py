@@ -175,7 +175,7 @@ def test_mock_smb_read_only(setup, monkeypatch, prefix):
     assert {call[0] for call in client.method_calls} == {'register_session', 'listdir', 'open_file'}
 
 
-def test_smb_login_failure_sanitized_and_load_continues(setup, monkeypatch, capsys):
+def test_smb_login_failure_sanitized_and_load_stops(setup, monkeypatch, capsys):
     config, db, run = setup
     from raptor_etl import source
     password = 'PASSWORD-CANARY'
@@ -186,14 +186,17 @@ def test_smb_login_failure_sanitized_and_load_continues(setup, monkeypatch, caps
     with pytest.raises(SourceError) as error:
         SMBSource(remote).names()
     assert password not in str(error.value)
-    assert statuses(run(remote)) == ['failed'] * 8
+    with pytest.raises(SourceError):
+        run(remote)
     monkeypatch.setattr(cli, 'load_config', lambda: remote)
     load = Mock(return_value=True)
     monkeypatch.setattr(cli, 'load_stage', load)
-    assert cli.main(['run']) == 1
-    load.assert_called_once()
+    assert cli.main(['run']) == 4
+    load.assert_not_called()
+    assert not list(config.archive_dir.iterdir())
+    assert db.execute('SELECT COUNT(*) FROM archived_file').fetchone()[0] == 0
     output = capsys.readouterr().out
-    assert output.count(': failed') == 8
+    assert 'FAIL source' in output
     assert password not in output
 
 
@@ -241,5 +244,6 @@ def test_unreachable_source_stale_cleanup(setup):
     config, db, run = setup
     partial = config.archive_dir / f'.2026-11-09_{EXPECTED_FILES[0]}.partial'
     partial.write_bytes(b'interrupted')
-    assert statuses(run(replace(config, source_path=config.source_path + '-absent'))) == ['failed'] * 8
-    assert not partial.exists()
+    with pytest.raises(SourceError):
+        collect(replace(config, source_path=config.source_path + '-absent'), db, Clock(config.timezone))
+    assert partial.read_bytes() == b'interrupted'

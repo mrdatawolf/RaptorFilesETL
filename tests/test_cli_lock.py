@@ -11,6 +11,7 @@ from raptor_etl.lock import run_lock
 
 
 def test_success_hooks(configured, monkeypatch):
+    (configured / "source").mkdir()
     calls = []
     monkeypatch.setattr(cli, 'collect_stage', lambda *args: calls.append('collect') or False)
     monkeypatch.setattr(cli, 'load_stage', lambda *args: calls.append('load') or True)
@@ -20,20 +21,17 @@ def test_success_hooks(configured, monkeypatch):
 
 @pytest.mark.parametrize('error', [LayoutError, ReconciliationError, ArchiveIntegrityError, OSError])
 def test_stage_error(configured, monkeypatch, error):
+    (configured / "source").mkdir()
     def fail(*args):
         raise error('secret-canary')
     monkeypatch.setattr(cli, 'collect_stage', fail)
     assert cli.main(['run']) == 1
 
 
-def test_entry_point_with_unreachable_source_and_schedule_stub(configured):
+def test_entry_point_with_unreachable_source(configured):
     executable = str(Path(sys.executable).with_name('raptor-etl'))
     result = subprocess.run([executable, 'run'], capture_output=True, text=True)
-    assert result.returncode == 1  # The configured source does not exist.
-    result = subprocess.run([executable, 'schedule'], capture_output=True, text=True)
-    assert result.returncode == 2
-    assert 'not implemented' in result.stdout
-    assert not result.stderr
+    assert result.returncode == 4  # The configured source does not exist.
 
 
 def test_second_run_and_death_release(configured):
@@ -54,9 +52,10 @@ def test_second_run_and_death_release(configured):
         process.stdout.close()
     with run_lock(path):
         pass
-    assert cli.main(['run']) == 1  # Lock released; collection now reports the absent source.
+    assert cli.main(['run']) == 4  # Lock released; precheck reports the absent source.
 
 
 def test_database_unusable(configured):
+    (configured / 'source').mkdir()
     (configured / 'bronze.db').write_bytes(b'not a sqlite database')
     assert cli.main(['run']) == 2

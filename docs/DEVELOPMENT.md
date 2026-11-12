@@ -104,3 +104,70 @@ problem is logged and the process exits with code 2.
 - Use a read-only SMB account limited to the report share.
 - Plant report files (`Samples/`, the archive) and databases are never
   committed.
+
+## Connection check
+
+On a Windows or Linux test box, create and activate a virtual environment
+(`python -m venv .venv`, then `.venv\Scripts\activate` on Windows or
+`source .venv/bin/activate` on Linux). Run `pip install -e ".[dev]"` from
+the checkout, copy `.env.example` to `.env`, and fill in the source,
+credentials, archive and database settings. Then run:
+
+```bash
+raptor-etl check
+docker exec <container> raptor-etl check  # same check inside the container
+```
+
+Each result says `INFO OK` or `ERROR FAIL` with a reason. Successful checks
+use INFO (visible by default); failures use ERROR. Source failures include the
+host/share or local path and the username where relevant, with passwords scrubbed. Every expected file is fully
+read and reports its byte size and SHA-256. A missing database says "will be
+created on first run" and is left absent; existing databases are inspected
+without migration. The check takes no run lock and writes no files.
+Archive writability is checked from filesystem access permissions without
+creating a probe file; an actual run still validates writes.
+Exit `0` means all checks passed, `1` means a file is absent or unreadable,
+`2` means invalid configuration or an unusable/unknown database, and `4`
+means the source connection, login or directory listing failed. Compare the
+test box and container results to isolate network or container setup issues.
+
+## Docker and TrueNAS deployment
+
+Build the image from the repository root with `docker build -t raptor-etl .`.
+The image uses Python 3.12 slim, runs as UID/GID `10001:10001`, and starts
+`raptor-etl schedule`. Logs go to stdout (`docker logs <container>`).
+
+Mount persistent storage at `/archive` and `/database`; the defaults are
+`RAPTOR_ARCHIVE_DIR=/archive` and `RAPTOR_DB_PATH=/database/bronze.db`.
+Mount the entire database directory so the run lock and SQLite sidecar files
+share persistent storage. Ensure both mounts already exist and are writable
+by UID/GID 10001. For a local source, mount it read-only and set
+`RAPTOR_SOURCE_PATH` to its container path. SMB sources need no share mount
+or privileged container.
+
+In a TrueNAS custom app, select the built image (make it available to the
+TrueNAS host), retain its default entry point, add the two storage mounts,
+and set environment variables using the configuration table above. Set
+`RAPTOR_SOURCE_PATH` and, for SMB, `RAPTOR_SMB_USERNAME` and
+`RAPTOR_SMB_PASSWORD` (plus optional `RAPTOR_SMB_DOMAIN`). Keep credentials
+in app environment settings. `.env` files, local samples and databases are
+excluded from the build context; `.env.example` remains available.
+
+The defaults are `RAPTOR_RUN_TIME=23:00`, `RAPTOR_RUN_DAYS=MON-FRI`,
+`RAPTOR_TIMEZONE=America/Los_Angeles`, and `RAPTOR_LOG_LEVEL=INFO`.
+Run time must be `HH:MM` in 24-hour form; days accept an inclusive ascending
+range such as `MON-FRI` or a comma list such as `MON,WED,FRI`.
+Scheduling uses `RAPTOR_TIMEZONE` directly and does not require `TZ`.
+A nonexistent spring-forward time is skipped; both occurrences of a
+fall-back time run. Missed runs while stopped or busy are not caught up.
+
+Startup performs `raptor-etl check` once and logs its exit code; a failure
+warns and scheduling continues. To diagnose connectivity later, run:
+
+```bash
+docker exec <container> raptor-etl check
+```
+
+SIGTERM (container stop) and SIGINT interrupt the scheduler wait immediately.
+If a pass is active, it finishes and releases its lock before shutdown;
+allow enough container termination grace time for a full pass.

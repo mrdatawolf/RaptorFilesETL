@@ -7,7 +7,8 @@ from pathlib import Path
 from icontract import ensure
 
 from .errors import ArchiveIntegrityError
-from .source import make_source
+from .precheck import precheck
+from .source import scrub_password, source_error
 
 EXPECTED_FILES = tuple(f'{report}.{extension}' for report in (
     'Downtime Summary', 'Production Summary', 'Production Todate', 'Thickness Breakdown'
@@ -47,6 +48,7 @@ def _copy(source, name, partial):
 @ensure(lambda result: tuple(item.original_name for item in result) == EXPECTED_FILES, enabled=True)
 def collect(config, database, clock) -> list[CollectOutcome]:
     """Called under the run lock, after configuration/database validation."""
+    source, names = precheck(config)
     started = clock.now()
     copy_date = started.strftime('%Y-%m-%d')
     logger = logging.getLogger('raptor_etl')
@@ -58,11 +60,6 @@ def collect(config, database, clock) -> list[CollectOutcome]:
                 partial.unlink()
         except OSError:
             cleanup_failed.add(name)
-    source = make_source(config)
-    try:
-        names = source.names()
-    except Exception:
-        names = None
     for name in EXPECTED_FILES:
         archive_name = f'{copy_date}_{name}'
         final = config.archive_dir / archive_name
@@ -72,9 +69,7 @@ def collect(config, database, clock) -> list[CollectOutcome]:
         try:
             if name in cleanup_failed:
                 raise OSError('stale partial cleanup failed')
-            if names is None:
-                reason = 'source connection or directory read failed'
-            elif name not in names:
+            if name not in names:
                 status, reason = 'missing', 'expected source file absent'
             else:
                 digest, size = _copy(source, name, partial)
@@ -101,17 +96,22 @@ def collect(config, database, clock) -> list[CollectOutcome]:
                     status, recorded_name = 'archived', archive_name
         except ArchiveIntegrityError as error:
             reason = str(error)
-        except Exception:
-            # Neither source/client nor filesystem/database exceptions are safe to log verbatim.
-            reason = 'source read, archive write, or database operation failed'
+        except Exception as error:
+            reason = source_error(error, config.smb_password,
+                                  local=not config.source_path.startswith(('//', '\\\\')),
+                                  path=config.source_path, username=config.smb_username).reason
         finally:
             try:
                 partial.unlink(missing_ok=True)
             except OSError:
                 status, reason = 'failed', 'partial cleanup failed'
+        reason = scrub_password(reason, config.smb_password)
         outcome = CollectOutcome(name, status, recorded_name, digest, reason)
         outcomes.append(outcome)
         logger.log(logging.ERROR if status in ('missing', 'failed') else logging.INFO,
-                   '%s: %s archive=%s sha256=%s %s', name, status,
-                   recorded_name or '-', digest[:12] if digest else '-', reason)
+                   '%s', scrub_password(
+                       '%s: %s archive=%s sha256=%s %s' % (
+                           name, status, recorded_name or '-',
+                           digest[:12] if digest else '-', reason),
+                       config.smb_password))
     return outcomes

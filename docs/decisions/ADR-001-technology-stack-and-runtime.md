@@ -76,6 +76,19 @@ on Linux, Windows and TrueNAS. The scheduler is a small loop built on
 `zoneinfo`, with no cron library needed. Locally, `run` can also be started by
 hand or from any OS scheduler.
 
+**Daylight-saving changes** (approved by Patrick, 2026-11-11). The scheduler
+follows the plant's wall clock and makes no special adjustment:
+- **Spring forward:** if `RAPTOR_RUN_TIME` doesn't exist that day (for
+  example 02:30), that day's run is skipped. This is accepted as a negligible
+  edge case.
+- **Fall back:** if `RAPTOR_RUN_TIME` occurs twice (for example 01:30), it
+  runs at both occurrences. This is harmless, because the second run finds
+  every file `unchanged` by hash and loads nothing (CONTRACT-001,
+  CONTRACT-003).
+
+The default of 23:00 is never affected, because Pacific changes happen at
+02:00.
+
 Only one run happens at a time, enforced with a lock. A second `run` started
 while one is in progress exits at once with exit code 3 and does nothing.
 
