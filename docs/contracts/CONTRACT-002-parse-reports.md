@@ -24,7 +24,8 @@ is a pure step: it reads a file and returns data, with no other side effects.
 
 ### Excluded
 
-- `.pdf` files and Thickness Breakdown. They are never parsed.
+- `.pdf` files and Thickness Breakdown. They are never parsed by this
+  contract. PDF parsing for the manual backfill is defined in CONTRACT-004.
 - Deduplicating, aggregating, renaming business terms, or converting units.
 - Writing to the database (CONTRACT-003).
 

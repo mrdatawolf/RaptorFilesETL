@@ -135,7 +135,8 @@ Foreign keys are enabled on every connection.
    This includes files archived in earlier runs whose load failed, so
    failures are retried automatically on every run that passes the
    CONTRACT-001 precheck. PDFs and Thickness
-   Breakdown are never selected. They are processed in `archived_at` order,
+   Breakdown are never selected (PDFs are loaded only by the manual
+   backfill, CONTRACT-004). They are processed in `archived_at` order,
    oldest first.
 2. **For each file:**
    1. Recalculate the archive file's SHA-256. If it doesn't match
@@ -196,7 +197,8 @@ Automated, against a temporary database and archive built from `Samples/`:
 - A fault injected after some rows are inserted → no rows remain for that
   file.
 - A tampered archive file → `ArchiveIntegrityError`.
-- PDFs and Thickness Breakdown are never loaded.
+- PDFs and Thickness Breakdown are never loaded by `run`. PDF loads by the
+  manual backfill are defined in CONTRACT-004.
 - Foreign keys are enforced, and the unique constraints reject duplicates.
 - Schema version: a new database is created at the current version, and a
   database with a newer version fails with exit code 2.

@@ -327,7 +327,12 @@ def checked_sum(values, file, check):
     return sum(values)
 
 
-def validate(report, file):
+def xls_volume_tolerance(total_volume, item_count):
+    """Full-precision cells: section volumes add up within 0.01 %."""
+    return abs(total_volume)*0.0001
+
+
+def validate(report, file, volume_tolerance=xls_volume_tolerance, tolerance_label='within 0.01%'):
     records = report.alarms or report.breakdown or report.days
     if not records:
         reconcile(file, 'at least one data record', '>= 1', 0)
@@ -361,8 +366,8 @@ def validate(report, file):
             if actual != total.pieces:
                 reconcile(file, f'{section} pieces sum', total.pieces, actual)
             volume = checked_sum([row.volume for row in items], file, f'{section} volume sum')
-            if total.volume is None or abs(volume-total.volume) > abs(total.volume)*0.0001:
-                reconcile(file, f'{section} volume sum (within 0.01%)', total.volume, volume)
+            if total.volume is None or abs(volume-total.volume) > volume_tolerance(total.volume, len(items)):
+                reconcile(file, f'{section} volume sum ({tolerance_label})', total.volume, volume)
         if len(set(totals)) != 1:
             reconcile(file, 'four Total pieces equal', totals[0], totals)
     else:

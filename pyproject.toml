@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "raptor-etl"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["xlrd>=2,<3", "smbprotocol", "python-dotenv", "tzdata", "icontract"]
+dependencies = ["xlrd>=2,<3", "smbprotocol", "python-dotenv", "tzdata", "icontract", "pdfplumber>=0.11,<0.12"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

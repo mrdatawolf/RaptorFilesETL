@@ -39,14 +39,19 @@ for later analysis.
   for storage, never as a data value.
 - Parsing the `.xls` version of each report into the bronze SQLite database.
 - Tracking file hashes so that the same file is never loaded twice.
+- A manual, last-resort backfill from the `.pdf` exports of Production Summary
+  and Production ToDate, for days with no `.xls` load (`raptor-etl
+  import-pdf`, CONTRACT-004). PDF values are rounded to the displayed
+  precision, and ToDate times from a PDF are invented.
 
 ### Excluded
 
 - Any change to files on the SMB share.
 - Other file types on the share.
 - Silver/gold layers: deduplicating across days, business modelling, reporting.
-- Parsing the `.pdf` files. They are archived only, because each one duplicates
-  its `.xls`.
+- Parsing `.pdf` files in the nightly run. They are archived only, because
+  each one duplicates its `.xls`. The only exception is the manual backfill
+  above.
 - Thickness Breakdown data. The report is only a chart and has no useful data
   for this project. Its files are archived but not parsed.
 

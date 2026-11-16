@@ -11,6 +11,7 @@ Selected in ADR-001 (approved 2026-11-11).
 |---|---|
 | Language | Python 3.12+ |
 | `.xls` reading | xlrd 2.x (BIFF8 `.xls` only) |
+| `.pdf` reading | pdfplumber 0.11.x, used only by `import-pdf` (ADR-002) |
 | Database | SQLite through the standard-library `sqlite3` module |
 | SMB access | smbprotocol (`smbclient` module), read directly, no mount |
 | Local `.env` | python-dotenv. Variables that are already set take precedence. |
@@ -45,6 +46,7 @@ cp .env.example .env               # then fill in local values
 pytest                             # run the test suite
 raptor-etl run                     # one complete pass: collect, parse, load
 raptor-etl schedule                # long-running scheduler (Docker entry point)
+raptor-etl import-pdf <folder>     # manual PDF backfill (CONTRACT-004)
 ```
 
 Exit codes for `raptor-etl run` (CONTRACT-001):
@@ -171,3 +173,36 @@ docker exec <container> raptor-etl check
 SIGTERM (container stop) and SIGINT interrupt the scheduler wait immediately.
 If a pass is active, it finishes and releases its lock before shutdown;
 allow enough container termination grace time for a full pass.
+
+## PDF backfill (last resort)
+
+`raptor-etl import-pdf <folder>` loads Production Summary and Production
+ToDate reports from their PDF exports, for days that have no `.xls` load
+(CONTRACT-004). Use it only when the `.xls` files for those days are gone.
+It never contacts the SMB share and does not change `run` or `schedule`.
+
+- The folder is searched recursively. File names are matched ignoring case
+  (`production summary.pdf`, `Production Todate.pdf`). Thickness Breakdown,
+  Downtime Summary and other PDFs are logged as `ignored: not supported`.
+- A PDF is skipped when an `.xls` load exists for the same report type and
+  printed date. Running the import again loads nothing new.
+- Each loaded PDF is archived as `{printed date}_{Production Summary|Production Todate}.pdf`.
+- PDF numbers are rounded to what the report shows. ToDate rows have no time
+  in the PDF: they are stored as `00:00:00`, and a repeated date gets
+  `00:00:01`, `00:00:02` and so on. These times are invented. PDF-sourced loads
+  are the `file_load` rows whose `archived_file.original_name` ends in `.pdf`.
+
+Exit codes: `0` every PDF loaded, skipped or ignored; `1` at least one PDF
+failed (see its log line and `load_failure`); `2` invalid configuration,
+folder or database; `3` another run in progress. To retry after a failure,
+fix the cause and run the same command again.
+
+On the Windows test box:
+
+```bat
+.venv\Scripts\activate
+raptor-etl import-pdf "C:\path\to\pdfs"
+```
+
+In Docker, mount the folder read-only into the container first, then run
+`docker exec <container> raptor-etl import-pdf /pdfs`.

@@ -1,7 +1,7 @@
 # TASK-008: PDF backfill import command
 
 Owner role: implementer
-Assigned agent:
+Assigned agent: Claude (main session)
 Proposed by: Claude (main session)
 Proposed date: 2026-11-16
 Approved by: Patrick
@@ -156,11 +156,94 @@ Findings from comparing 11/09 PDF and XLS:
 
 ## Blocker
 
-None.
+**Existing tests broken by the new `Samples/` layout (not caused by this
+task).** 28 tests in `test_collect.py`, `test_load.py`, `test_load_e2e.py`
+and `test_check.py` expect the old flat `Samples/` (the 8 share files at the
+top level, including `Downtime Summary.pdf`). Needs Patrick: restore the
+original flat set alongside `PDF/` and `XLS/`, or approve a task to repoint
+those tests. Until then the full suite cannot pass.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-008
+Implementer: Claude (main session)
+Date: 2026-11-16
+
+### Changes made
+
+- `src/raptor_etl/parse/pdf.py` (new): `parse_pdf_report(path, report_type)`
+  for Production Summary and ToDate, using pdfplumber word positions.
+  Summary values are matched to their section's Total column, item labels
+  to the area left of the Pieces label (including labels that wrap onto the
+  next lines, e.g. `No Data`), and KPIs to the value below each label. ToDate
+  values go to the nearest column label by right edge. Repeated dates get
+  the next second. `pdf_printed_at()` reads the printed date of a PDF that
+  failed to parse, for its archive name.
+- `src/raptor_etl/importpdf.py` (new): `import_pdfs()`, covering candidate
+  discovery, the already-loaded and `.xls` skip rules, verified archive copy,
+  `archived_file`, load through the existing `_insert_report`, and
+  `load_failure`.
+- `src/raptor_etl/cli.py`: `import-pdf <folder>` command. No source
+  precheck. The folder is checked before the lock.
+- `src/raptor_etl/parse/__init__.py`: `validate()` takes the volume
+  tolerance as a parameter. The `.xls` default and its message are unchanged.
+- `pyproject.toml`: `pdfplumber>=0.11,<0.12`. The Dockerfile needs no change.
+- `tests/test_import_pdf.py` (new): 20 tests.
+
+### Validation performed
+
+- `pytest tests/test_import_pdf.py`: 20 passed.
+- Full suite: 319 passed, 28 failed, 7 skipped. The 28 failures are
+  identical with and without this change (compared by stashing it). They are
+  caused by the reorganised `Samples/` folder (see Blocker below), not by
+  this task.
+- Manual end-to-end run against a scratch database, with `.xls` loaded for
+  11/09 and 11/13 (log output matched the test).
+
+### Acceptance criteria evidence
+
+- ADR-002 and CONTRACT-004 were approved and committed (2e1990a) before code.
+- Cross-check: `test_summary_cross_check` and `test_todate_cross_check`
+  found zero mismatches, with identical record order (see deviation 1 for
+  which days).
+- Skip rule: `test_import_skips_xls_days_and_is_idempotent`.
+- Re-run loads nothing and exits 0: same test. Table contents are compared
+  before and after.
+- Malformed PDF → `load_failure`, others load, exit 1:
+  `test_corrupt_pdf_is_archived_with_failure_and_others_load`.
+- `run`/`schedule`/`check` unchanged: no code changes there. The same
+  failure set before and after. The nightly `load_stage` selects no PDF rows
+  (asserted).
+- Windows: uses `pathlib` only and the existing lock. Not run on Windows yet.
+
+### Assumptions and deviations
+
+1. **Sample days differ from CONTRACT-004's validation wording.**
+   `Samples/XLS/11_11_2026` holds reports printed **2026-11-13**, not 11/11.
+   The true same-day pairs are PDF 11/09 ↔ XLS 11/09 and PDF 11/13 ↔ XLS
+   folder `11_11_2026`. The tests use those pairs. The end-to-end import
+   therefore loads 11/10 and 11/11 and skips 11/09 and 11/13. The contract's
+   behavior is unchanged, but its "Validation requirements" names the wrong
+   days and needs Patrick's correction.
+2. Any other `.pdf` in the folder is logged as `ignored: not supported`.
+   Non-PDF files are ignored silently.
+3. An unreadable PDF (e.g. a corrupt file) is a `LayoutError`
+   ("cannot read PDF"), so it is archived and recorded as a parse failure.
+
+### Unresolved risks
+
+- Only four sample days exist. Untested layouts (page breaks inside the
+  Length/Grade/Width sections, very long labels) would fail with a
+  `LayoutError` rather than load wrong data.
+- Found but out of scope: `Samples/XLS/11_11_2026/Downtime Summary.xls` (the
+  2026-11-13 empty day) fails the existing `.xls` parser with "at least one
+  data record". The nightly run would record a `load_failure` for such days
+  and retry it every night.
+
+### Documentation updated
+
+DEVELOPMENT.md (stack, commands, PDF backfill section), PROJECT.md scope,
+CONTRACT-002 and CONTRACT-003 (the amendments listed in CONTRACT-004).
 
 ## Review
 

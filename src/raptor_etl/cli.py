@@ -1,6 +1,8 @@
 """Command entry points; stage implementations arrive in subsequent tasks."""
 import argparse
 from contextlib import closing
+import os
+from pathlib import Path
 import sqlite3
 
 from .clock import Clock
@@ -28,10 +30,28 @@ def load_stage(config, database, clock) -> bool:
     return load_reports(config, database, clock)
 
 
+def import_pdf_command(config, folder: Path) -> int:
+    """CONTRACT-004: no source precheck; the share is never contacted."""
+    try:
+        readable = folder.is_dir() and os.access(folder, os.R_OK | os.X_OK)
+    except (OSError, ValueError):
+        readable = False
+    if not readable:
+        raise ConfigError("import-pdf: folder must exist and be readable")
+    from .importpdf import import_pdfs
+
+    with run_lock(config.db_path):
+        with closing(open_database(config.db_path)) as database:
+            return 0 if import_pdfs(config, database, Clock(config.timezone), folder) else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="raptor-etl")
-    parser.add_argument("command", choices=("run", "schedule", "check"))
+    parser.add_argument("command", choices=("run", "schedule", "check", "import-pdf"))
+    parser.add_argument("folder", nargs="?", help="import-pdf only: folder of PDF exports")
     args = parser.parse_args(argv)
+    if (args.command == "import-pdf") != (args.folder is not None):
+        parser.error("a folder is required for import-pdf and only allowed there")
     logger = configure_logging()
     try:
         config = load_config(read_only=True) if args.command == "check" else load_config()
@@ -44,6 +64,8 @@ def main(argv=None) -> int:
             from .check import check
             return schedule(config, logger, run_pass=lambda: main(["run"]),
                             startup_check=lambda: check(config, logger))
+        if args.command == "import-pdf":
+            return import_pdf_command(config, Path(args.folder))
         with run_lock(config.db_path):
             precheck(config)
             with closing(open_database(config.db_path)) as database:
