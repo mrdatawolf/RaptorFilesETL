@@ -248,7 +248,7 @@ or file writes.
   record" to "each section title before that section's first record". The
   original wording rejected the sample file. Found during TASK-003.
 
-- 2026-11-16 (proposed, TASK-010, awaiting approval): "at least one data
+- 2026-11-16 (approved): "at least one data
   record" is replaced by "Empty reports". A day with no production is a
   valid result: Downtime Summary returns zero alarms when its `No Downtimes`
   placeholder is shown; Production Summary drops its placeholder items and

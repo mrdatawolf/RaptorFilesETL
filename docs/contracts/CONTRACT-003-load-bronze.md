@@ -219,7 +219,7 @@ Automated, against a temporary database and archive built from `Samples/`:
 
 ## Amendments
 
-- 2026-11-16 (proposed, TASK-010, awaiting approval): added "Empty reports".
+- 2026-11-16 (Approved): added "Empty reports".
   A no-production day loads with `record_count` 0 (Downtime, ToDate) or 4
   (Production Summary Totals) instead of failing.
 

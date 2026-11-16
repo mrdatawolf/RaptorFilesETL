@@ -218,7 +218,7 @@ message when `Samples/` is absent.
 
 ## Amendments
 
-- 2026-11-16 (proposed, TASK-010, awaiting approval): "At least one data
+- 2026-11-16 (Approved): "At least one data
   record" is replaced by the CONTRACT-002 "Empty reports" rules. The
   2026-11-13 Production Summary PDF gives the four Total rows only, the same
   as its `.xls`.
