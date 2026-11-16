@@ -13,6 +13,7 @@ Samples/
 *.db-journal
 *.db-wal
 *.db-shm
+*.db.lock
 
 # Personal Claude Code settings (shared settings.json stays tracked)
 .claude/settings.local.json
