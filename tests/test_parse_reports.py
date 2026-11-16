@@ -13,7 +13,7 @@ from raptor_etl.errors import LayoutError, ReconciliationError
 from raptor_etl.parse import parse_grid, parse_report, DAY_COLUMNS, TITLES
 from raptor_etl.parse.grid import Cell, Grid, read_grid
 
-SAMPLES = Path(__file__).resolve().parents[1] / 'Samples'
+SAMPLES = Path(__file__).resolve().parents[1] / 'Samples' / 'XLS' / '11_09_2026'
 FILES = {'downtime_summary': 'Downtime Summary.xls',
          'production_summary': 'Production Summary.xls',
          'production_todate': 'Production Todate.xls'}
@@ -97,7 +97,7 @@ def sample_path():
     def get(kind):
         path = SAMPLES / FILES[kind]
         if not path.is_file():
-            pytest.skip(f'Samples/ reference file absent: {path.name}')
+            pytest.skip(f'Sample reference file absent: {path}')
         return path
     return get
 

@@ -1,8 +1,6 @@
 """TASK-007 read-only checks and source preconditions, offline."""
 import hashlib
 import io
-from pathlib import Path
-import shutil
 import sqlite3
 from unittest.mock import Mock
 
@@ -19,11 +17,8 @@ def snapshot(root):
 
 
 @pytest.fixture
-def local(configured):
-    samples = Path(__file__).resolve().parents[1] / 'Samples'
-    if not samples.is_dir():
-        pytest.skip('Samples/ is absent; check requires a local copy')
-    shutil.copytree(samples, configured / 'source')
+def local(configured, make_share):
+    make_share(configured / 'source')
     return configured
 
 

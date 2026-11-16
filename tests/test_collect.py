@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import io
 import logging
 from pathlib import Path
-import shutil
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
@@ -18,7 +17,6 @@ from raptor_etl.database import open_database
 from raptor_etl.lock import run_lock
 from raptor_etl.source import SMBSource, SourceError
 
-SAMPLES = Path(__file__).resolve().parents[1] / 'Samples'
 
 
 def snapshot(root):
@@ -27,11 +25,8 @@ def snapshot(root):
 
 
 @pytest.fixture
-def setup(tmp_path):
-    if not SAMPLES.is_dir():
-        pytest.skip('Samples/ is absent; collect tests require a temporary copy of Samples/')
-    source = tmp_path / 'source'
-    shutil.copytree(SAMPLES, source)
+def setup(tmp_path, make_share):
+    source = make_share(tmp_path / 'source')
     archive = tmp_path / 'archive'
     archive.mkdir()
     config = Config(str(source), archive, tmp_path / 'bronze.db',

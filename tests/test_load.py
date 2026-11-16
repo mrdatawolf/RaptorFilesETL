@@ -3,8 +3,6 @@ from dataclasses import astuple
 from datetime import datetime, timezone
 import hashlib
 import logging
-from pathlib import Path
-import shutil
 import sqlite3
 from zoneinfo import ZoneInfo
 
@@ -17,7 +15,6 @@ from raptor_etl.database import CURRENT_VERSION, open_database
 from raptor_etl.errors import ConfigError, LayoutError, ReconciliationError
 from raptor_etl.parse import parse_report
 
-SAMPLES = Path(__file__).resolve().parents[1] / 'Samples'
 REPORT_TABLES = ('downtime_alarm', 'downtime_total', 'production_summary_kpi',
                  'production_summary_breakdown', 'production_todate_day')
 ALL_TABLES = ('archived_file', 'file_load', 'load_failure', *REPORT_TABLES)
@@ -48,11 +45,8 @@ def archive_file(environment, name, content, archived_at='2026-11-10 23:00:00'):
 
 
 @pytest.fixture
-def samples(environment, tmp_path):
-    if not SAMPLES.is_dir():
-        pytest.skip('Samples/ is absent; load tests require a temporary copy of Samples/')
-    source = tmp_path / 'source'
-    shutil.copytree(SAMPLES, source)
+def samples(environment, tmp_path, make_share):
+    source = make_share(tmp_path / 'source')
     for path in sorted(source.iterdir()):
         if path.is_file():
             archive_file(environment, path.name, path.read_bytes())

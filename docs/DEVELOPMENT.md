@@ -92,8 +92,16 @@ problem is logged and the process exits with code 2.
 
 - Each contract's "Validation requirements" section is the minimum test list
   for that stage.
-- `Samples/` is the reference fixture set. It is gitignored, so tests that
-  need it skip with a clear message when it is absent.
+- `Samples/` holds real reports (gitignored, local only) in this layout:
+  `Samples/XLS/<MM_DD_YYYY>/` (the four share `.xls` files) and
+  `Samples/PDF/<MM_DD_YYYY>/` (hand-downloaded PDFs, lowercase names, no
+  Downtime Summary). Folder names are not report dates: `XLS/11_11_2026`
+  holds reports printed 2026-11-13. Tests that need a missing sample skip
+  with a message naming it.
+- The reference day is `XLS/11_09_2026` and `PDF/11_09_2026`. The
+  `make_share` fixture (`tests/conftest.py`) builds the 8 CONTRACT-001 share
+  files from it, renaming the PDFs to the share's spelling and writing a
+  stand-in `Downtime Summary.pdf` (collect never reads PDF content).
 - Tests run offline against a local source folder. SMB is tested by hand
   against the real share before deployment.
 - Time-dependent behavior (copy date, schedule) is tested with an injected

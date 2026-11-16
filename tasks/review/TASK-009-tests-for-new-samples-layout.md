@@ -1,7 +1,7 @@
 # TASK-009: Repoint tests to the new `Samples/` layout
 
 Owner role: implementer
-Assigned agent:
+Assigned agent: Claude (main session)
 Proposed by: Claude (main session)
 Proposed date: 2026-11-16
 Approved by: Patrick
@@ -88,6 +88,14 @@ Facts checked:
    `Production Summary.pdf`. Were the samples renamed when copied, or is the
    share lowercase? If it is lowercase, that needs its own task (not this one).
   - those were the real files so we need to account for lowercase issue.
+  - Clarified (Patrick, 2026-11-16): the `Samples/PDF` files were downloaded
+    by hand, which is how restore PDFs will arrive (`import-pdf` already
+    ignores case). They do not show what is on the share, which follows
+    CONTRACT-001 (8 Title Case files). No contract change. The test "share"
+    therefore uses the sample PDFs renamed to the share's spelling, plus a
+    generated `Downtime Summary.pdf` stand-in (decision 1 resolved that way).
+    Case-insensitive matching in the nightly collect is not needed for this
+    and is out of scope.
 
 ## Plan
 
@@ -118,7 +126,49 @@ None.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-009
+Implementer: Claude (main session)
+Date: 2026-11-16
+
+### Changes made
+
+- `tests/conftest.py`: new `make_share` fixture. It builds the 8
+  CONTRACT-001 files from `Samples/XLS/11_09_2026` and
+  `Samples/PDF/11_09_2026`, renaming the PDFs to the share's spelling, with a
+  generated `Downtime Summary.pdf` stand-in. It skips with the missing path
+  if a reference file is absent.
+- `test_collect.py`, `test_check.py`, `test_load.py`, `test_load_e2e.py`:
+  their fixtures use `make_share` instead of copying `Samples/`.
+- `test_parse_reports.py`: reads `.xls` from `Samples/XLS/11_09_2026`.
+- Unused `SAMPLES`, `shutil` and `Path` imports removed from those modules.
+- DEVELOPMENT.md: "Testing philosophy" describes the layout and the
+  reference day.
+
+### Validation performed
+
+- Before: 319 passed, 28 failed, 7 skipped.
+- After: **354 passed, 0 failed, 0 skipped.** The 28 now pass, and the 7
+  `test_parse_reports` tests that were silently skipping now run.
+- With `Samples/` moved away: 293 passed, 61 skipped, each skip naming the
+  missing file.
+- `git diff tests/` shows no assertion or expected-value changes.
+
+### Acceptance criteria evidence
+
+All four met, per the validation above. No application code changed.
+
+### Assumptions and deviations
+
+- Decision 1 was resolved as recorded under Decisions: the stand-in is
+  generated. No deviations.
+
+### Unresolved risks
+
+- Renaming or removing the 11/09 reference folders makes these tests skip.
+
+### Documentation updated
+
+DEVELOPMENT.md (Testing philosophy).
 
 ## Review
 

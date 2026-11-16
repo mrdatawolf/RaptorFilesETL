@@ -168,6 +168,18 @@ Foreign keys are enabled on every connection.
   tables, `file_load` or `archived_file`. `load_failure` rows are kept as
   history.
 
+### Empty reports
+
+A report with no production (CONTRACT-002, "Empty reports") loads like any
+other report:
+
+- Downtime Summary: `file_load` with `record_count` 0, one `downtime_total`
+  row (`occurrences` 0, `total_duration` as parsed), no `downtime_alarm`
+  rows.
+- Production Summary: `file_load` with `record_count` 4, one
+  `production_summary_kpi` row, and the four Total rows.
+- Production ToDate with zero rows: `file_load` with `record_count` 0.
+
 ## Failure behavior
 
 | Situation | Behavior |
@@ -197,11 +209,19 @@ Automated, against a temporary database and archive built from `Samples/`:
 - A fault injected after some rows are inserted → no rows remain for that
   file.
 - A tampered archive file → `ArchiveIntegrityError`.
+- The 2026-11-13 sample `.xls` set (all three types) loads with exit
+  code 0 and the rows listed under "Empty reports".
 - PDFs and Thickness Breakdown are never loaded by `run`. PDF loads by the
   manual backfill are defined in CONTRACT-004.
 - Foreign keys are enforced, and the unique constraints reject duplicates.
 - Schema version: a new database is created at the current version, and a
   database with a newer version fails with exit code 2.
+
+## Amendments
+
+- 2026-11-16 (proposed, TASK-010, awaiting approval): added "Empty reports".
+  A no-production day loads with `record_count` 0 (Downtime, ToDate) or 4
+  (Production Summary Totals) instead of failing.
 
 ## Open questions
 

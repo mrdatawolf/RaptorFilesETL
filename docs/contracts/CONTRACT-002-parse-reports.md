@@ -164,7 +164,8 @@ If a check fails, the parser raises `ReconciliationError` (a kind of
 `LayoutError`), naming the check and the expected and actual values. No
 partial result is returned.
 
-- **All types:** the result has at least one data record.
+- **All types:** zero data records are valid only as an empty report (see
+  "Empty reports" below). Otherwise a report with no records fails.
 - **Downtime Summary:**
   - Sum of `alarms.occurrences` = `grand_total.occurrences`.
   - Sum of `alarms.total_duration` = `grand_total.total_duration`, to the
@@ -178,6 +179,32 @@ partial result is returned.
   - The non-Total `volume` values add up to the Total `volume` within 0.01 %.
 - **Production ToDate:** every record has a non-null `run_start`. No two
   records share the same `run_start`.
+
+### Empty reports (no production)
+
+Raptor produces real reports for days with no production
+(`Samples/XLS/11_11_2026`, printed 2026-11-13). They are valid results, not
+failures.
+
+- **Downtime Summary.** The report shows one placeholder line, the text
+  `No Downtimes` in the alarm description area with no Alarm ID, followed by
+  `Occurrences: 0` and no durations. The result is **zero alarms** and a
+  `grand_total` of `occurrences` = 0 and `total_duration` as printed (blank
+  becomes `null`; `00:00:00` is kept). The placeholder is not an alarm.
+  - Zero alarms are valid **only** when the placeholder is present and the
+    Grand Total occurrences is 0. Zero alarms without the placeholder, or
+    the placeholder together with real alarms, raise `ReconciliationError`.
+  - With zero alarms, the Grand Total duration must be `null` or `00:00:00`.
+- **Production Summary.** A placeholder item is a section's **only**
+  non-Total item when that item has 0 pieces, 0 volume and 0 % vol, and the
+  section's Total has 0 pieces. In the sample it is labelled `No Data`
+  (Product, Length, Grade) or `0.00` (Width). The rule uses the values, not
+  the label. Placeholder items are **not returned**. The section keeps its
+  Total row (0 pieces), so an empty day has 4 records, one Total per
+  section. `row_order` is numbered after placeholders are removed. KPIs are
+  kept as printed (blank values are `null`).
+- **Production ToDate.** Zero rows are valid when all 10 column labels are
+  present.
 
 These hold for every file in `Samples/` (for example, Downtime is 380
 occurrences, 01:49:49; Production Summary is 58,004 pieces in all four
@@ -207,6 +234,12 @@ or file writes.
 - Passing the wrong type (for example a Downtime file declared as Production
   Summary) raises `LayoutError`.
 - A non-`.xls` file raises `LayoutError`.
+- Empty reports: the 2026-11-13 Downtime Summary gives zero alarms and a
+  grand total of 0 occurrences with a `null` duration. The 2026-11-13
+  Production Summary gives exactly the four Total rows, with 0 pieces. Altered
+  fixtures: zero alarms without the placeholder, the placeholder with a
+  nonzero Grand Total, and the placeholder together with an alarm all raise
+  `ReconciliationError`.
 
 ## Amendments
 
@@ -214,6 +247,12 @@ or file writes.
   precondition changed from "all section titles before the first data
   record" to "each section title before that section's first record". The
   original wording rejected the sample file. Found during TASK-003.
+
+- 2026-11-16 (proposed, TASK-010, awaiting approval): "at least one data
+  record" is replaced by "Empty reports". A day with no production is a
+  valid result: Downtime Summary returns zero alarms when its `No Downtimes`
+  placeholder is shown; Production Summary drops its placeholder items and
+  keeps the four Total rows; Production ToDate may have zero rows.
 
 ## Open questions
 

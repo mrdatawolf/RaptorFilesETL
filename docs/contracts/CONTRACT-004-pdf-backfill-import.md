@@ -137,7 +137,9 @@ folder. Step 2 sees no `file_load`, so it is parsed and loaded again.
 
 Failures raise `ReconciliationError`. No partial result is returned.
 
-- At least one data record.
+- Empty reports follow CONTRACT-002 "Empty reports": Production Summary
+  placeholder items are not returned, and a ToDate with zero rows is valid.
+  Any other result with no records fails.
 - **Production Summary:** each section has exactly one Total row. In each
   section, non-Total `pieces` add up to the Total exactly. All four Total
   `pieces` are equal. Non-Total `volume` values add up to the Total
@@ -213,6 +215,13 @@ message when `Samples/` is absent.
   exit 1.
 - `run`, `schedule` and `check` tests pass unchanged. The nightly load never
   selects PDF archive rows.
+
+## Amendments
+
+- 2026-11-16 (proposed, TASK-010, awaiting approval): "At least one data
+  record" is replaced by the CONTRACT-002 "Empty reports" rules. The
+  2026-11-13 Production Summary PDF gives the four Total rows only, the same
+  as its `.xls`.
 
 ## Open questions
 

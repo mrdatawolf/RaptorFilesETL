@@ -1,7 +1,7 @@
 # TASK-010: Reports with no data are valid
 
 Owner role: implementer
-Assigned agent:
+Assigned agent: Claude (main session)
 Proposed by: Claude (main session)
 Proposed date: 2026-11-16
 Approved by: Patrick

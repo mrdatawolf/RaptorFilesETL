@@ -1,6 +1,5 @@
 """CLI collect-to-bronze validation using scratch copies of Samples/."""
 from datetime import datetime, timezone
-from pathlib import Path
 import shutil
 import sqlite3
 
@@ -9,16 +8,14 @@ import pytest
 from raptor_etl import cli
 from raptor_etl.clock import Clock
 
-SAMPLES = Path(__file__).resolve().parents[1] / 'Samples'
-pytestmark = pytest.mark.skipif(not SAMPLES.is_dir(), reason='Samples/ is absent; CLI load tests require sample reports')
 TABLES = ('archived_file', 'file_load', 'load_failure', 'downtime_alarm',
           'downtime_total', 'production_summary_kpi',
           'production_summary_breakdown', 'production_todate_day')
 
 
 @pytest.fixture
-def sample_run(configured, monkeypatch):
-    shutil.copytree(SAMPLES, configured / 'source')
+def sample_run(configured, monkeypatch, make_share):
+    make_share(configured / 'source')
     archive = configured / 'archive'
     archive.mkdir()
     monkeypatch.setenv('RAPTOR_ARCHIVE_DIR', str(archive))
