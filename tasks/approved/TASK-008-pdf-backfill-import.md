@@ -6,7 +6,7 @@ Proposed by: Claude (main session)
 Proposed date: 2026-11-16
 Approved by: Patrick
 Approved date: 2026-11-16
-Related contracts: CONTRACT-002, CONTRACT-003 (both need amendment, or a new CONTRACT-004)
+Related contracts: CONTRACT-004 (new); CONTRACT-002, CONTRACT-003 (small amendments)
 Related ADRs: ADR-001; ADR-002 (new, pdfplumber dependency, to be written)
 Dependencies: TASK-005
 
@@ -95,6 +95,10 @@ Findings from comparing 11/09 PDF and XLS:
    `YYYY-MM-DD` (honest, but a different format in the same column).
    Recommendation: `YYYY-MM-DD`, and record the difference in the contract.
   - `YYYY-MM-DD 00:00:00` the other programmers will understand that its invented.
+  - Repeated dates (Patrick, 2026-11-16): every sample ToDate PDF has two
+    16-Sep-2026 rows. A later row with the same date gets the next second
+    (`00:00:01`, …), so the unique (load, `run_start`) rule still holds.
+    No schema change.
 2. **Archive `copy_date` for backfilled PDFs.** Options: the report's printed
    date, or the folder name (`11_09_2026`). Recommendation: the printed date,
    so the importer does not depend on how folders are named.
