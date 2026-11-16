@@ -11,7 +11,7 @@ import re
 
 from icontract import ensure
 
-from . import DAY_COLUMNS, DURATION, SECTIONS, TITLES, layout, validate
+from . import DAY_COLUMNS, DURATION, SECTIONS, TITLES, drop_placeholders, layout, validate
 from .models import Breakdown, Day, Header, KPIs, ParsedReport
 
 SUPPORTED = ('production_summary', 'production_todate')
@@ -286,8 +286,8 @@ def production(pages, file):
     if seen != set(SECTIONS):
         layout(file, f'missing section titles: {set(SECTIONS)-seen}')
     ordered = sorted(records, key=lambda item: item[0])
-    return kpi_values, tuple(replace(record, row_order=index)
-                             for index, (_, record) in enumerate(ordered, 1))
+    return kpi_values, drop_placeholders(tuple(replace(record, row_order=index)
+                                               for index, (_, record) in enumerate(ordered, 1)))
 
 
 def todate(pages, file):

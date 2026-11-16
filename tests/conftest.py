@@ -17,11 +17,9 @@ def configured(tmp_path, monkeypatch):
     return tmp_path
 
 
-# Reference sample day (gitignored, local only). Samples/XLS/11_09_2026 is the
-# original fixture set; its values are what the tests assert.
+# Real sample reports (gitignored, local only). The default day, 11_09_2026, is
+# the original fixture set; its values are what the tests assert.
 SAMPLES = __import__('pathlib').Path(__file__).resolve().parents[1] / 'Samples'
-REFERENCE_XLS = SAMPLES / 'XLS' / '11_09_2026'
-REFERENCE_PDF = SAMPLES / 'PDF' / '11_09_2026'
 # No Downtime Summary PDF sample exists. Collect copies and hashes PDFs but never
 # reads them, so a stand-in is enough for share-shaped tests.
 DOWNTIME_PDF_STAND_IN = b'%PDF-1.4\n% test stand-in for Downtime Summary.pdf\n'
@@ -37,19 +35,18 @@ def make_share():
     from raptor_etl.collect import EXPECTED_FILES
     import shutil
 
-    def build(target):
+    def build(target, xls_day='11_09_2026', pdf_day='11_09_2026'):
         target.mkdir(parents=True, exist_ok=True)
         for name in EXPECTED_FILES:
             if name.endswith('.xls'):
-                source = REFERENCE_XLS / name
+                source = SAMPLES / 'XLS' / xls_day / name
             else:
-                source = REFERENCE_PDF / name.lower()
+                source = SAMPLES / 'PDF' / pdf_day / name.lower()
             if source.is_file():
                 shutil.copyfile(source, target / name)
             elif name == 'Downtime Summary.pdf':
                 (target / name).write_bytes(DOWNTIME_PDF_STAND_IN)
             else:
-                pytest.skip(f'Sample reference file absent: {source} '
-                            '(needs Samples/XLS/11_09_2026 and Samples/PDF/11_09_2026)')
+                pytest.skip(f'Sample file absent: {source}')
         return target
     return build

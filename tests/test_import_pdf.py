@@ -35,7 +35,7 @@ def pdf(day, kind):
 
 @pytest.mark.parametrize('kind', NAMES)
 @pytest.mark.parametrize('day,count', [('11_09_2026', (34, 81)), ('11_10_2026', (30, 81)),
-                                       ('11_11_2026', (35, 81)), ('11_13_2026', (8, 80))])
+                                       ('11_11_2026', (35, 81)), ('11_13_2026', (4, 80))])
 def test_all_sample_days_parse(day, count, kind):
     report = parse_pdf_report(pdf(day, kind), kind)
     records = report.breakdown or report.days
@@ -94,10 +94,23 @@ def test_repeated_date_gets_next_second_and_blank_is_null():
     assert blank.slow_pct is None and blank.fast_pct == 100.0
 
 
-def test_wrapped_label_and_empty_day():
+def test_wrapped_label(monkeypatch):
+    # The only wrapped label in the samples is the 11/13 Length placeholder
+    # ("No" / "Data"), so read it with placeholder removal switched off.
+    from raptor_etl.parse import pdf as pdf_module
+    monkeypatch.setattr(pdf_module, 'drop_placeholders', lambda breakdown: breakdown)
     report = parse_pdf_report(pdf('11_13_2026', 'production_summary'), 'production_summary')
     assert [r.label for r in report.breakdown if r.section == 'length'] == ['No Data', 'Total']
+
+
+def test_empty_day_matches_xls():
+    kind = 'production_summary'
+    report = parse_pdf_report(pdf('11_13_2026', kind), kind)
+    assert [(r.row_order, r.section, r.label, r.is_total, r.pieces) for r in report.breakdown] == [
+        (1, 'product', 'Total', True, 0), (2, 'length', 'Total', True, 0),
+        (3, 'grade', 'Total', True, 0), (4, 'width', 'Total', True, 0)]
     assert report.kpis.trimmer_speed_slow_pct is None
+    assert report.breakdown == parse_report(XLS / '11_11_2026' / f'{NAMES[kind]}.xls', kind).breakdown
 
 
 def test_wrong_title_and_unsupported_type():

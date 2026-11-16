@@ -117,7 +117,72 @@ None.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-010
+Implementer: Claude (main session)
+Date: 2026-11-16
+
+### Changes made
+
+- `src/raptor_etl/parse/__init__.py`:
+  - `downtime()` recognises the `No Downtimes` placeholder (after the
+    headers) and reports it to `validate()`.
+  - New `drop_placeholders()` applies the CONTRACT-002 value rule (a
+    section's only item, with 0/0/0, and a Total of 0 pieces). It renumbers
+    `row_order`.
+  - `validate()` covers the empty-Downtime checks (no alarms, Grand Total
+    0, duration null or `00:00:00`). A ToDate with zero rows is allowed.
+    Downtime without the placeholder, and Summary with no records, still
+    fail with "at least one data record".
+- `src/raptor_etl/parse/pdf.py`: Production Summary uses `drop_placeholders()`.
+- No changes to the loader, schema or CLI. `record_count` 0 and 4 already
+  work.
+
+### Validation performed
+
+- Full suite: **366 passed**, 0 failed, 0 skipped (from 354 at TASK-009 hand-off).
+- Real empty-day samples:
+  - `.xls` Downtime gives `()`, and `GrandTotal(0, None)`.
+  - `.xls` and PDF Production Summary each give exactly the 4 Total rows,
+    and the two are identical.
+  - ToDate has 80 rows.
+- `run` on the 11/13 set exits 0 and stores `record_count` 0 / 4 / 80, one
+  `downtime_total` (0, NULL), and the four Total rows
+  (`test_empty_day_run_loads_empty_reports`).
+
+### Acceptance criteria evidence
+
+- Amendments approved and committed (246bc80) before code.
+- Empty Downtime `.xls` loads with `record_count` 0 and one `downtime_total`:
+  the e2e test.
+- Empty Summary, `.xls` and PDF the same: `test_empty_day_samples` and
+  `test_empty_day_matches_xls`.
+- Still rejected: no placeholder (`test_empty_records[downtime_summary]`),
+  nonzero Grand Total, nonzero duration, placeholder plus an alarm
+  (`test_empty_downtime_rejections`).
+- `run` on 11/13 exits 0: e2e test.
+
+### Assumptions and deviations
+
+- Three existing tests encoded the old rule, and their expectations changed
+  as the amendments require:
+  - `test_empty_records[production_todate]` now expects zero rows to be valid.
+  - The 11/13 PDF Summary count went from 8 to 4.
+  - The wrapped-label test now reads the 11/13 Length label with placeholder
+    removal switched off, because that placeholder is the only wrapped label
+    in the samples.
+- `make_share` takes optional `xls_day`/`pdf_day` (default 11/09).
+
+### Unresolved risks
+
+- Only one empty-day sample. Other placeholder wording is rejected, which
+  is the safe failure.
+- The wrapped-label PDF logic is covered only by a placeholder label that
+  is now dropped in normal parsing.
+
+### Documentation updated
+
+The contracts were amended before code (approved). No other docs needed
+changes.
 
 ## Review
 

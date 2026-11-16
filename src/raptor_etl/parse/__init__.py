@@ -20,6 +20,7 @@ TITLES = {
 SECTIONS = ('product', 'length', 'grade', 'width')
 DAY_COLUMNS = ('Date', 'Fast %', 'Medium %', 'Slow %', 'Lug Fill', 'BF Per Piece',
                'Trimloss', 'Total Stops', 'Downtime', 'Volume')
+NO_DOWNTIMES = 'No Downtimes'   # empty-day placeholder (CONTRACT-002)
 DURATION = re.compile(r'\d+:[0-5]\d:[0-5]\d\Z')
 
 
@@ -144,6 +145,7 @@ def downtime(grid, file):
     total = GrandTotal(None, None)
     seen = set()
     occurrence_label = None
+    placeholder = False
     for r in range(len(grid.rows)):
         row = grid.populated(r)
         if furniture(row):
@@ -155,6 +157,10 @@ def downtime(grid, file):
                 seen.add(label)
         if any(label in labels for label in required):
             continue
+        if NO_DOWNTIMES in labels:
+            if seen != set(required):
+                layout(file, 'downtime headers must precede first alarm')
+            placeholder = True
         # Alarm IDs are text in the BIFF export. Anchor them to the ID header.
         candidates = [(c, cell) for c, cell in row
                       if re.fullmatch(r'\d+', cell.text) or cell.ctype == xlrd.XL_CELL_NUMBER]
@@ -204,7 +210,7 @@ def downtime(grid, file):
         layout(file, f'missing downtime headers: {set(required)-seen}')
     if current is not None:
         alarms.append(Alarm(len(alarms)+1, **current))
-    return tuple(alarms), total
+    return tuple(alarms), total, placeholder
 
 
 def todate(grid, file):
@@ -332,9 +338,42 @@ def xls_volume_tolerance(total_volume, item_count):
     return abs(total_volume)*0.0001
 
 
-def validate(report, file, volume_tolerance=xls_volume_tolerance, tolerance_label='within 0.01%'):
+def drop_placeholders(breakdown):
+    """Remove empty-day placeholder items (CONTRACT-002 "Empty reports").
+
+    A placeholder is a section's only non-Total item, with 0 pieces, 0 volume
+    and 0 % vol, in a section whose Total has 0 pieces. Values decide, not the
+    label (`No Data`, or `0.00` for Width).
+    """
+    drop = set()
+    for section in SECTIONS:
+        rows = [row for row in breakdown if row.section == section]
+        items = [row for row in rows if not row.is_total]
+        totals = [row for row in rows if row.is_total]
+        if (len(items) == 1 and len(totals) == 1 and totals[0].pieces == 0
+                and (items[0].pieces, items[0].volume, items[0].pct_volume) == (0, 0, 0)):
+            drop.add(items[0].row_order)
+    kept = [row for row in breakdown if row.row_order not in drop]
+    return tuple(replace(row, row_order=index) for index, row in enumerate(kept, 1))
+
+
+def validate(report, file, volume_tolerance=xls_volume_tolerance, tolerance_label='within 0.01%',
+             placeholder=False):
+    """Reconcile a parsed report. placeholder: Downtime showed `No Downtimes`."""
     records = report.alarms or report.breakdown or report.days
-    if not records:
+    if report.report_type == 'downtime_summary' and placeholder:
+        if report.alarms:
+            reconcile(file, f'{NO_DOWNTIMES} placeholder with alarms', 0, len(report.alarms))
+        total = report.grand_total
+        if total is None or total.occurrences != 0:
+            reconcile(file, f'{NO_DOWNTIMES} grand total occurrences', 0,
+                      total.occurrences if total else None)
+        if total.total_duration not in (None, '00:00:00'):
+            reconcile(file, f'{NO_DOWNTIMES} grand total duration', 'null or 00:00:00',
+                      total.total_duration)
+        return
+    # ToDate may have zero rows; other types need records unless empty as above.
+    if not records and report.report_type != 'production_todate':
         reconcile(file, 'at least one data record', '>= 1', 0)
     if report.report_type == 'downtime_summary':
         total = report.grand_total
@@ -387,14 +426,16 @@ def parse_grid(grid: Grid, report_type: str, filename='<grid>') -> ParsedReport:
         layout(filename, f'unsupported report type {report_type!r}')
     metadata, page_count = header(grid, report_type, filename)
     kwargs = {}
+    placeholder = False
     if report_type == 'downtime_summary':
-        kwargs['alarms'], kwargs['grand_total'] = downtime(grid, filename)
+        kwargs['alarms'], kwargs['grand_total'], placeholder = downtime(grid, filename)
     elif report_type == 'production_summary':
-        kwargs['kpis'], kwargs['breakdown'] = production(grid, filename)
+        kpis, breakdown = production(grid, filename)
+        kwargs['kpis'], kwargs['breakdown'] = kpis, drop_placeholders(breakdown)
     else:
         kwargs['days'] = todate(grid, filename)
     result = ParsedReport(report_type, metadata, page_count, **kwargs)
-    validate(result, filename)
+    validate(result, filename, placeholder=placeholder)
     return result
 
 

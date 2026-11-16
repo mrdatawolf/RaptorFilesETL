@@ -10,7 +10,8 @@ import pytest
 import xlrd
 
 from raptor_etl.errors import LayoutError, ReconciliationError
-from raptor_etl.parse import parse_grid, parse_report, DAY_COLUMNS, TITLES
+from raptor_etl.parse import drop_placeholders, parse_grid, parse_report, DAY_COLUMNS, TITLES
+from raptor_etl.parse.models import Breakdown, GrandTotal
 from raptor_etl.parse.grid import Cell, Grid, read_grid
 
 SAMPLES = Path(__file__).resolve().parents[1] / 'Samples' / 'XLS' / '11_09_2026'
@@ -196,8 +197,77 @@ def test_empty_records(kind):
     else:
         grid = replace(grid, rows=tuple(cells for cells in grid.rows
                                        if not any(c.text in ('Pieces', 'Volume', '% vol') for c in cells)))
+    if kind == 'production_todate':
+        # CONTRACT-002 "Empty reports": a ToDate with headers and no rows is valid.
+        assert parse_grid(grid, kind, 'empty.xls').days == ()
+        return
     with pytest.raises(ReconciliationError, match='at least one data record.*expected.*actual'):
         parse_grid(grid, kind, 'empty.xls')
+
+
+def empty_downtime(*extra_rows, grand_total=0, duration=None):
+    """The 2026-11-13 empty-day Downtime layout, built by hand."""
+    rows = common('downtime_summary') + [
+        row((2, 'Alarm ID'), (7, 'Alarm Description:'), (18, 'Details (hh:mm:ss)')),
+        row((5, 'No Downtimes'), (18, 'Total:')),
+        row((5, 'Occurrences:')),
+        row((9, 0), (18, 'Min. Duration:')),
+        row((18, 'Max. Duration:')),
+        *extra_rows,
+        row((5, 'Grand Total:'), (9, grand_total), (18, 'Grand Total:'), *(((24, duration),) if duration else ())),
+        row((25, 'Page 1 of 1'))]
+    return Grid(tuple(rows))
+
+
+def test_empty_downtime_placeholder():
+    report = parse_grid(empty_downtime(), 'downtime_summary', 'empty.xls')
+    assert (report.alarms, report.grand_total) == ((), GrandTotal(0, None))
+    assert parse_grid(empty_downtime(duration='00:00:00'), 'downtime_summary').grand_total == GrandTotal(0, '00:00:00')
+
+
+@pytest.mark.parametrize('grid,check', [
+    (lambda: empty_downtime(grand_total=3), 'No Downtimes grand total occurrences'),
+    (lambda: empty_downtime(duration='00:00:05'), 'No Downtimes grand total duration'),
+    (lambda: empty_downtime(row((2, '7'), (5, 'Alarm text'), (18, 'Total:'), (24, '00:00:10')),
+                            row((5, 'Occurrences:')), row((9, 0), (18, 'Min. Duration:'), (24, '00:00:00')),
+                            row((18, 'Max. Duration:'), (24, '00:00:10'))),
+     'No Downtimes placeholder with alarms'),
+])
+def test_empty_downtime_rejections(grid, check):
+    with pytest.raises(ReconciliationError, match=check):
+        parse_grid(grid(), 'downtime_summary', 'empty.xls')
+
+
+def summary_rows(item, total, label='No Data'):
+    return (Breakdown(1, 'product', label, False, *item), Breakdown(2, 'product', 'Total', True, *total))
+
+
+@pytest.mark.parametrize('rows,kept', [
+    (summary_rows((0, 0.0, 0.0), (0, 0.0, 0.0)), ['Total']),
+    (summary_rows((0, 0.0, 0.0), (0, 0.0, 0.0), label='0.00'), ['Total']),
+    (summary_rows((1, 2.0, 100.0), (1, 2.0, 100.0)), ['No Data', 'Total']),
+    (summary_rows((0, 0.0, None), (0, 0.0, 0.0)), ['No Data', 'Total']),
+    (summary_rows((0, 0.0, 0.0), (0, 0.0, 0.0)) + (Breakdown(3, 'product', 'Other', False, 0, 0.0, 0.0),),
+     ['No Data', 'Total', 'Other']),
+])
+def test_drop_placeholders_rule(rows, kept):
+    result = drop_placeholders(rows)
+    assert [r.label for r in result] == kept
+    assert [r.row_order for r in result] == list(range(1, len(kept) + 1))
+
+
+EMPTY_DAY = SAMPLES.parent / '11_11_2026'   # reports printed 2026-11-13
+
+
+@pytest.mark.skipif(not EMPTY_DAY.is_dir(), reason='Samples/XLS/11_11_2026 (empty day) is absent')
+def test_empty_day_samples():
+    downtime = parse_report(EMPTY_DAY / 'Downtime Summary.xls', 'downtime_summary')
+    assert (downtime.alarms, downtime.grand_total) == ((), GrandTotal(0, None))
+    summary = parse_report(EMPTY_DAY / 'Production Summary.xls', 'production_summary')
+    assert [(r.section, r.label, r.is_total, r.pieces, r.volume, r.pct_volume) for r in summary.breakdown] == [
+        (section, 'Total', True, 0, 0, 0) for section in ('product', 'length', 'grade', 'width')]
+    todate = parse_report(EMPTY_DAY / 'Production Todate.xls', 'production_todate')
+    assert len(todate.days) == 80
 
 
 @pytest.mark.parametrize('field,value,check', [

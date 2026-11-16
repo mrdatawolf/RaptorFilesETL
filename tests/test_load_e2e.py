@@ -87,3 +87,23 @@ def test_corrupt_archive_load_fails_after_successful_collect(sample_run, monkeyp
             ('ArchiveIntegrityError',)]
         assert set(dict(db.execute('SELECT report_type, record_count FROM file_load'))) == {
             'production_summary', 'production_todate'}
+
+
+def test_empty_day_run_loads_empty_reports(configured, monkeypatch, make_share):
+    """CONTRACT-003 "Empty reports": the 2026-11-13 no-production day (XLS/11_11_2026)."""
+    make_share(configured / 'source', xls_day='11_11_2026', pdf_day='11_13_2026')
+    archive = configured / 'archive'
+    archive.mkdir()
+    monkeypatch.setenv('RAPTOR_ARCHIVE_DIR', str(archive))
+    monkeypatch.setattr(cli, 'Clock', lambda zone: Clock(
+        zone, lambda: datetime(2026, 11, 14, 7, 0, tzinfo=timezone.utc)))
+    assert cli.main(['run']) == 0
+    with sqlite3.connect(configured / 'bronze.db') as db:
+        assert dict(db.execute('SELECT report_type, record_count FROM file_load')) == {
+            'downtime_summary': 0, 'production_summary': 4, 'production_todate': 80}
+        assert counts(db) == dict(zip(TABLES, (8, 3, 0, 0, 1, 1, 4, 80)))
+        assert db.execute('SELECT occurrences, total_duration FROM downtime_total').fetchall() == [(0, None)]
+        assert db.execute('SELECT section, label, is_total, pieces FROM production_summary_breakdown '
+                          'ORDER BY row_order').fetchall() == [
+            ('product', 'Total', 1, 0), ('length', 'Total', 1, 0),
+            ('grade', 'Total', 1, 0), ('width', 'Total', 1, 0)]
