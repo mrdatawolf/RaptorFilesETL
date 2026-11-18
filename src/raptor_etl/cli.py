@@ -47,7 +47,7 @@ def import_pdf_command(config, folder: Path) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="raptor-etl")
-    parser.add_argument("command", choices=("run", "schedule", "check", "import-pdf"))
+    parser.add_argument("command", choices=("run", "check", "import-pdf"))
     parser.add_argument("folder", nargs="?", help="import-pdf only: folder of PDF exports")
     args = parser.parse_args(argv)
     if (args.command == "import-pdf") != (args.folder is not None):
@@ -59,11 +59,6 @@ def main(argv=None) -> int:
             from .check import check
             return check(config, logger)
         logger = configure_logging(config.log_level)
-        if args.command == "schedule":
-            from .scheduler import schedule
-            from .check import check
-            return schedule(config, logger, run_pass=lambda: main(["run"]),
-                            startup_check=lambda: check(config, logger))
         if args.command == "import-pdf":
             return import_pdf_command(config, Path(args.folder))
         with run_lock(config.db_path):

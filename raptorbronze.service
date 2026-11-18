@@ -1,0 +1,11 @@
+[Unit]
+Description=Raptor reports bronze ETL
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=biztech
+Group=biztech
+WorkingDirectory=/srv/RaptorFilesETL
+ExecStart=/srv/RaptorFilesETL/start.sh

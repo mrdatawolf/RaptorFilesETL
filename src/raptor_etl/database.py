@@ -25,23 +25,28 @@ SCHEMA = (
     id INTEGER PRIMARY KEY, archived_file_id INTEGER NOT NULL REFERENCES archived_file(id),
     attempted_at TEXT NOT NULL, error_type TEXT NOT NULL, error_message TEXT NOT NULL)""",
     """CREATE TABLE downtime_alarm (
+    id INTEGER PRIMARY KEY,
     file_load_id INTEGER NOT NULL REFERENCES file_load(id), row_order INTEGER NOT NULL,
     alarm_id INTEGER NOT NULL, description TEXT NOT NULL, occurrences INTEGER,
     total_duration TEXT, min_duration TEXT, max_duration TEXT,
     UNIQUE(file_load_id,row_order))""",
     """CREATE TABLE downtime_total (
+    id INTEGER PRIMARY KEY,
     file_load_id INTEGER NOT NULL UNIQUE REFERENCES file_load(id),
     occurrences INTEGER, total_duration TEXT)""",
     """CREATE TABLE production_summary_kpi (
+    id INTEGER PRIMARY KEY,
     file_load_id INTEGER NOT NULL UNIQUE REFERENCES file_load(id),
     avg_bf_per_piece REAL, lug_fill REAL, trimloss REAL,
     trimmer_speed_slow_pct REAL, trimmer_speed_medium_pct REAL, trimmer_speed_fast_pct REAL)""",
     """CREATE TABLE production_summary_breakdown (
+    id INTEGER PRIMARY KEY,
     file_load_id INTEGER NOT NULL REFERENCES file_load(id), row_order INTEGER NOT NULL,
     section TEXT NOT NULL CHECK(section IN ('product','length','grade','width')),
     label TEXT NOT NULL, is_total INTEGER NOT NULL CHECK(is_total IN (0,1)),
     pieces INTEGER, volume REAL, pct_volume REAL, UNIQUE(file_load_id,row_order))""",
     """CREATE TABLE production_todate_day (
+    id INTEGER PRIMARY KEY,
     file_load_id INTEGER NOT NULL REFERENCES file_load(id), row_order INTEGER NOT NULL,
     run_start TEXT NOT NULL, fast_pct REAL, medium_pct REAL, slow_pct REAL,
     lug_fill REAL, bf_per_piece REAL, trimloss REAL, total_stops INTEGER,

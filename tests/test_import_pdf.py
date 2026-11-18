@@ -159,7 +159,10 @@ def loads(root):
 
 def test_import_skips_xls_days_and_is_idempotent(importer, capsys):
     seed_xls(importer)
-    assert cli.main(['import-pdf', str(PDF)]) == 0
+    folder = importer / 'pdfs'
+    for day in ('11_09_2026', '11_10_2026', '11_11_2026', '11_13_2026'):
+        shutil.copytree(PDF / day, folder / day)
+    assert cli.main(['import-pdf', str(folder)]) == 0
     out = capsys.readouterr().out
     assert out.count('skipped: xls already loaded for 2026-11-09') == 2
     assert out.count('skipped: xls already loaded for 2026-11-13') == 2
@@ -173,7 +176,7 @@ def test_import_skips_xls_days_and_is_idempotent(importer, capsys):
     with sqlite3.connect(importer / 'bronze.db') as db:
         before = {t: db.execute(f'SELECT * FROM {t}').fetchall()
                   for t in ('archived_file', 'file_load', 'load_failure', 'production_todate_day')}
-    assert cli.main(['import-pdf', str(PDF)]) == 0
+    assert cli.main(['import-pdf', str(folder)]) == 0
     assert capsys.readouterr().out.count('skipped: already loaded') == 4
     with sqlite3.connect(importer / 'bronze.db') as db:
         assert {t: db.execute(f'SELECT * FROM {t}').fetchall() for t in before} == before

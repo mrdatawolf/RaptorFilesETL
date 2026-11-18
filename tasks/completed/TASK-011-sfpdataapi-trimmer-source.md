@@ -1,7 +1,7 @@
 # TASK-011: Make the bronze database SFPDataAPI's `trimmer` source
 
 Owner role: implementer
-Assigned agent:
+Assigned agent: Codex
 Proposed by: Claude (main session)
 Proposed date: 2026-11-17
 Approved by: Patrick
@@ -167,12 +167,83 @@ same change set, listed here so the plan is in one place)
 
 ## Blocker
 
-ADR-003 needs approval, including its open questions (scheduler removal, and
-the host and install path).
+Resolved: ADR-003 was approved by Patrick on 2026-11-18. Remove the
+scheduler and install at `/srv/RaptorFilesETL` as `biztech`.
 
 ## Implementation handoff
 
-Not started.
+### Changes made
+
+- RaptorFilesETL: added integer primary keys to the five report tables in
+  schema version 1, preserving the existing columns, constraints and load
+  behavior. Added the sample VACUUM test and updated affected fixtures.
+  Added the Linux launch and snapshot scripts, systemd units, and Windows
+  launcher. Removed Docker packaging, the built-in scheduler and its
+  settings. Removed obsolete scheduler assignments from the gitignored
+  local `.env`. Updated the project, deployment, architecture and contract
+  docs. ADR-003 already says Approved.
+- SFPDataAPI: prepared changes to `server/config.ts`, `.env.example`
+  and `README.md` to register `trimmer` as a RaptorFilesETL-built SQLite
+  source. The temporary checkout's local `.env` used
+  `TRIMMER_DB=../RaptorFilesETL/trimmer.db`. Ingest code was unchanged.
+- SFP_Tally_ETL: prepared removal of Raptor delivery from `start.sh`,
+  `.env.example` and `README.md`.
+- SFP_Mill_Data_Pipeline.md: prepared the flow and status update for the
+  `trimmer` feed.
+
+### Validation performed
+
+- `.venv/bin/python -m pytest -q tests/test_load_e2e.py::test_report_rows_stable_after_vacuum_and_rerun tests/test_database.py`
+  → 21 passed. The initial full run caught stale Config fixtures and
+  extra local PDF sample days. Adjusted the fixtures to exercise the
+  approved four-day PDF set and retain all assertions.
+- `.venv/bin/python -m pytest -q tests/test_load.py tests/test_load_e2e.py tests/test_import_pdf.py tests/test_collect.py tests/test_config.py tests/test_database.py`
+  → 87 passed.
+- `.venv/bin/python -m pytest -q` → 327 passed.
+- `bash /tmp/task-011.SdkRmG/verify-launcher.sh` → exit 0 delivered
+  `trimmer.db` with three report loads and SQLite integrity check `ok`.
+  Exit 1 delivered a snapshot and preserved status 1. Invalid archive
+  configuration forced exit 2, a stub forced exit 3, and a missing source
+  forced exit 4. Each left its destination empty. The missing-destination
+  case exited 2 with the expected diagnostic before calling the ETL stub.
+- In the temporary SFPDataAPI checkout,
+  `PATH="$HOME/.nvm/versions/node/v24.16.0/bin:$PATH" npm test`
+  → 10 passed. Started the API with
+  `HOST=127.0.0.1 APIPORT=17304 SCAN_ON_START=false SCAN_INTERVAL_HOURS=0 DB_PATH="$PWD/test-bronze" ./node_modules/.bin/tsx server/index.ts`
+  using the same Node 24 PATH. The readiness probe at `/` logged a missing
+  UI build in the temporary copy. Both ingest requests returned HTTP 200.
+- Ran `curl -fsS -X POST 'http://127.0.0.1:17304/api/ingest/scan?source=trimmer'`
+  twice → eight tables scanned each time. First scan inserted 148 rows.
+  Second scan inserted 0 and skipped 148. A PGlite query verified eight
+  physical `bronze.trimmer__*` tables.
+- `systemd-analyze verify ./raptorbronze.service ./raptorbronze.timer`
+  → exit 1, with the sole diagnostic that the install path
+  `/srv/RaptorFilesETL/start.sh` does not exist locally.
+  `systemd-analyze calendar 'Mon..Fri 23:00 America/Los_Angeles'`
+  accepted and normalized the expression.
+- `bash -n start.sh`, `bash -n push_db.sh`, `bash -n SFP_Tally_ETL/start.sh`
+  (temporary copy), `.venv/bin/raptor-etl --help` and `git diff --check`
+  passed. CLI help lists `run`, `check` and `import-pdf`.
+- `git -C /home/patrick/Documents/Github/SFP apply --check /tmp/TASK-011-sibling-changes.patch`
+  passed. The patch was also applied to a temporary copy of the original
+  files and compared with the tested files.
+
+### Deviations and unresolved issues
+
+- The filesystem sandbox allows writes only in RaptorFilesETL and
+  `/tmp`. The patch at `/tmp/TASK-011-sibling-changes.patch` contains
+  all seven tracked sibling changes, relative to the parent `SFP`
+  directory. Applying the patch to the live checkouts and editing their
+  local `.env` files remain pending. SFP_Tally_ETL's live local `.env`
+  still has the `RAPTOR_DB_PATH` entry. Local environment changes are
+  excluded from the patch.
+- Windows was unavailable, so `start.bat` was checked by inspection only.
+  Production deployment was outside implementation scope. No SSH,
+  deployment, commit or push was performed.
+- Deployment requires deleting the old database and archive before the
+  first run, since the replaced schema also reports version 1. The
+  office-side `TRIMMER_DB` is assumed to be
+  `/srv/data/bronze/trimmer.db`.
 
 ## Review
 

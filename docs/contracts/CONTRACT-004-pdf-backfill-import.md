@@ -26,7 +26,7 @@ never parses PDFs.
 
 ### Excluded
 
-- Any change to `run`, `schedule`, `check`, collect (CONTRACT-001) or the
+- Any change to `run`, `check`, collect (CONTRACT-001) or the
   nightly load (CONTRACT-003).
 - Downtime Summary PDFs. There is no sample to build or test a parser with.
 - Thickness Breakdown, as with `.xls`.
@@ -37,8 +37,7 @@ never parses PDFs.
 
 ## Actors
 
-- An operator, running the command by hand on the test box or with
-  `docker exec`.
+- An operator, running the command by hand from the host virtual environment.
 
 ## Inputs and outputs
 
@@ -151,7 +150,8 @@ Failures raise `ReconciliationError`. No partial result is returned.
 ## Postconditions and invariants
 
 - CONTRACT-003's invariants hold: loaded once, all or nothing, count
-  matches, lineage, append-only.
+  matches, lineage, append-only and stable row IDs. Imported rows reach
+  SFPDataAPI with the next delivered `trimmer.db` snapshot.
 - No PDF is loaded for a report type and day that already had an `.xls`
   load when the import ran.
 - Running the import again on the same folder loads nothing new.
@@ -213,7 +213,7 @@ message when `Samples/` is absent.
 - Running again loads nothing new and exits 0.
 - A corrupt PDF: archived, `load_failure` recorded, other files load,
   exit 1.
-- `run`, `schedule` and `check` tests pass unchanged. The nightly load never
+- `run` and `check` tests pass unchanged. The nightly load never
   selects PDF archive rows.
 
 ## Amendments

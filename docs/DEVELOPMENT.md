@@ -1,7 +1,7 @@
 # Development Guide
 
 Project-specific operational details. The stack and runtime come from
-ADR-001; behavior comes from CONTRACT-001 to CONTRACT-003.
+ADR-001 through ADR-003. Behavior comes from CONTRACT-001 through CONTRACT-004.
 
 ## Technology stack
 
@@ -45,7 +45,6 @@ cp .env.example .env               # then fill in local values
 
 pytest                             # run the test suite
 raptor-etl run                     # one complete pass: collect, parse, load
-raptor-etl schedule                # long-running scheduler (Docker entry point)
 raptor-etl import-pdf <folder>     # manual PDF backfill (CONTRACT-004)
 ```
 
@@ -57,8 +56,7 @@ configuration or unusable archive or database, `3` another run in progress,
 ## Configuration
 
 All settings come from environment variables (ADR-001). Locally, a gitignored
-`.env` is loaded if present. In Docker, they are set in the TrueNAS custom
-app's environment settings. Never commit settings or secrets.
+`.env` is loaded if present. Never commit settings or secrets.
 
 | Variable | Required | Default |
 |---|---|---|
@@ -69,11 +67,9 @@ app's environment settings. Never commit settings or secrets.
 | `RAPTOR_ARCHIVE_DIR` | yes | – |
 | `RAPTOR_DB_PATH` | yes | – |
 | `RAPTOR_TIMEZONE` | no | `America/Los_Angeles` |
-| `RAPTOR_RUN_TIME` | no | `23:00` |
-| `RAPTOR_RUN_DAYS` | no | `MON-FRI` |
 | `RAPTOR_LOG_LEVEL` | no | `INFO` |
 
-All variables are validated at startup. If any problem is found, every
+Python validates the `RAPTOR_*` settings listed above at startup. If any problem is found, every
 problem is logged and the process exits with code 2.
 
 ## Coding conventions
@@ -104,7 +100,7 @@ problem is logged and the process exits with code 2.
   stand-in `Downtime Summary.pdf` (collect never reads PDF content).
 - Tests run offline against a local source folder. SMB is tested by hand
   against the real share before deployment.
-- Time-dependent behavior (copy date, schedule) is tested with an injected
+- Time-dependent behavior (copy date) is tested with an injected
   clock, never the system clock.
 
 ## Security and privacy
@@ -125,7 +121,6 @@ credentials, archive and database settings. Then run:
 
 ```bash
 raptor-etl check
-docker exec <container> raptor-etl check  # same check inside the container
 ```
 
 Each result says `INFO OK` or `ERROR FAIL` with a reason. Successful checks
@@ -138,56 +133,49 @@ Archive writability is checked from filesystem access permissions without
 creating a probe file; an actual run still validates writes.
 Exit `0` means all checks passed, `1` means a file is absent or unreadable,
 `2` means invalid configuration or an unusable/unknown database, and `4`
-means the source connection, login or directory listing failed. Compare the
-test box and container results to isolate network or container setup issues.
+means the source connection, login or directory listing failed.
 
-## Docker and TrueNAS deployment
+## Host deployment
 
-Build the image from the repository root with `docker build -t raptor-etl .`.
-The image uses Python 3.12 slim, runs as UID/GID `10001:10001`, and starts
-`raptor-etl schedule`. Logs go to stdout (`docker logs <container>`).
+ADR-003 installs the Linux job in `/srv/RaptorFilesETL` as `biztech`.
+Use Python 3.12+ to create `.venv` there and install the package with
+`.venv/bin/pip install .`. Give `biztech` access to the project, archive
+and database directories. Set the configuration in `.env` using shell
+assignments, quoting values as needed.
 
-Mount persistent storage at `/archive` and `/database`; the defaults are
-`RAPTOR_ARCHIVE_DIR=/archive` and `RAPTOR_DB_PATH=/database/bronze.db`.
-Mount the entire database directory so the run lock and SQLite sidecar files
-share persistent storage. Ensure both mounts already exist and are writable
-by UID/GID 10001. For a local source, mount it read-only and set
-`RAPTOR_SOURCE_PATH` to its container path. SMB sources need no share mount
-or privileged container.
+**Before the first run of this schema, delete the old database and archive.**
+Create an empty writable archive directory. Both schemas use version 1,
+so an existing database would retain the old schema. Archived reports
+from before deployment are discarded.
 
-In a TrueNAS custom app, select the built image (make it available to the
-TrueNAS host), retain its default entry point, add the two storage mounts,
-and set environment variables using the configuration table above. Set
-`RAPTOR_SOURCE_PATH` and, for SMB, `RAPTOR_SMB_USERNAME` and
-`RAPTOR_SMB_PASSWORD` (plus optional `RAPTOR_SMB_DOMAIN`). Keep credentials
-in app environment settings. `.env` files, local samples and databases are
-excluded from the build context; `.env.example` remains available.
+Set `PUSH_PULL=push` and `RAPTOR_PUSH_DEST` to the rsync destination
+directory. These two settings belong to the Linux launcher. Delivery
+requires rsync and SSH access for `biztech` when using a remote
+destination. For a local check, use an existing local directory.
 
-The defaults are `RAPTOR_RUN_TIME=23:00`, `RAPTOR_RUN_DAYS=MON-FRI`,
-`RAPTOR_TIMEZONE=America/Los_Angeles`, and `RAPTOR_LOG_LEVEL=INFO`.
-Run time must be `HH:MM` in 24-hour form; days accept an inclusive ascending
-range such as `MON-FRI` or a comma list such as `MON,WED,FRI`.
-Scheduling uses `RAPTOR_TIMEZONE` directly and does not require `TZ`.
-A nonexistent spring-forward time is skipped; both occurrences of a
-fall-back time run. Missed runs while stopped or busy are not caught up.
+Install `raptorbronze.service` and `raptorbronze.timer` in
+`/etc/systemd/system/`, reload systemd with `systemctl daemon-reload`
+and enable the timer with `systemctl enable --now raptorbronze.timer`.
+The timer starts the oneshot service Monday through Friday at 23:00
+America/Los_Angeles. Missed runs are skipped. Inspect logs with
+`journalctl -u raptorbronze.service`.
 
-Startup performs `raptor-etl check` once and logs its exit code; a failure
-warns and scheduling continues. To diagnose connectivity later, run:
+`start.sh` runs the ETL and delivers a SQLite backup snapshot named
+`trimmer.db` on exit 0 or 1. On successful delivery it returns the ETL
+status. A delivery failure returns the failing command's status. Set
+`TRIMMER_DB=/srv/data/bronze/trimmer.db` in the deployed SFPDataAPI
+configuration and remove the stale `raptor.db` from the bronze server
+during cutover.
 
-```bash
-docker exec <container> raptor-etl check
-```
-
-SIGTERM (container stop) and SIGINT interrupt the scheduler wait immediately.
-If a pass is active, it finishes and releases its lock before shutdown;
-allow enough container termination grace time for a full pass.
+On Windows, create `.venv`, install the package as described above and
+run `start.bat` to build the local database.
 
 ## PDF backfill (last resort)
 
 `raptor-etl import-pdf <folder>` loads Production Summary and Production
 ToDate reports from their PDF exports, for days that have no `.xls` load
 (CONTRACT-004). Use it only when the `.xls` files for those days are gone.
-It never contacts the SMB share and does not change `run` or `schedule`.
+It runs against the local archive and database.
 
 - The folder is searched recursively. File names are matched ignoring case
   (`production summary.pdf`, `Production Todate.pdf`). Thickness Breakdown,
@@ -211,6 +199,3 @@ On the Windows test box:
 .venv\Scripts\activate
 raptor-etl import-pdf "C:\path\to\pdfs"
 ```
-
-In Docker, mount the folder read-only into the container first, then run
-`docker exec <container> raptor-etl import-pdf /pdfs`.

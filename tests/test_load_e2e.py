@@ -107,3 +107,21 @@ def test_empty_day_run_loads_empty_reports(configured, monkeypatch, make_share):
                           'ORDER BY row_order').fetchall() == [
             ('product', 'Total', 1, 0), ('length', 'Total', 1, 0),
             ('grade', 'Total', 1, 0), ('width', 'Total', 1, 0)]
+
+
+def test_report_rows_stable_after_vacuum_and_rerun(sample_run):
+    from contextlib import closing
+
+    def report_rows(db):
+        return {table: db.execute(f'SELECT rowid, * FROM {table} ORDER BY rowid').fetchall()
+                for table in TABLES[3:]}
+
+    assert cli.main(['run']) == 0
+    with closing(sqlite3.connect(sample_run / 'bronze.db')) as db:
+        before = report_rows(db)
+        assert all(before.values())
+        db.execute('VACUUM')
+        assert report_rows(db) == before
+    assert cli.main(['run']) == 0
+    with closing(sqlite3.connect(sample_run / 'bronze.db')) as db:
+        assert report_rows(db) == before

@@ -79,6 +79,7 @@ foreign key, which the database enforces.
 
 ### Report tables
 
+Every report table declares `id INTEGER PRIMARY KEY` as its first column.
 Every report row has `file_load_id` (INTEGER, not null, FK → `file_load`)
 and `row_order` (INTEGER, not null), and (`file_load_id`, `row_order`) is
 unique. Through `file_load_id`, each row traces to its file, hash, copy date
@@ -115,6 +116,10 @@ The database records its schema version (`PRAGMA user_version`). On startup:
 - a new database gets the current schema;
 - an older version is upgraded by ordered, recorded migrations;
 - a version newer than the code knows → exit code 2, nothing written.
+
+TASK-011 replaces schema version 1 in place. `MIGRATIONS` has one entry
+and there is no migration from the old version 1. Delete the old database
+before deployment.
 
 Foreign keys are enabled on every connection.
 
@@ -164,9 +169,11 @@ Foreign keys are enabled on every connection.
   values (CONTRACT-002) with nothing rounded, defaulted or reordered.
 - **Lineage:** every report row traces back through `file_load` and
   `archived_file` to a file in the archive.
-- **Append-only:** the load stage never updates or deletes rows in report
-  tables, `file_load` or `archived_file`. `load_failure` rows are kept as
-  history.
+- **Append-only:** `run` and `import-pdf` never update or delete written rows.
+  `load_failure` stays append-only history. Every table declares
+  `id INTEGER PRIMARY KEY`, which aliases SQLite's `rowid` and preserves it
+  through `VACUUM`. SFPDataAPI deduplicates the `trimmer` source by hashing
+  row content including `rowid`.
 
 ### Empty reports
 
@@ -204,6 +211,8 @@ Automated, against a temporary database and archive built from `Samples/`:
 - Spot values match the source: the 2026-09-23 `slow_pct` is NULL,
   `avg_bf_per_piece` = 2.8713249629155975, both 2026-09-16 rows are present.
 - A second run loads nothing new.
+- Load the sample `.xls` set, run `VACUUM`, and run the load again. Every
+  report row retains its original `rowid` and content.
 - A file that fails to parse: `load_failure` recorded and no report rows.
   After replacing the fixture with a valid file, the next run loads it.
 - A fault injected after some rows are inserted → no rows remain for that
@@ -214,7 +223,7 @@ Automated, against a temporary database and archive built from `Samples/`:
 - PDFs and Thickness Breakdown are never loaded by `run`. PDF loads by the
   manual backfill are defined in CONTRACT-004.
 - Foreign keys are enforced, and the unique constraints reject duplicates.
-- Schema version: a new database is created at the current version, and a
+- Schema version: a new database is created at version 1 with a declared `id INTEGER PRIMARY KEY` in every table, and a
   database with a newer version fails with exit code 2.
 
 ## Amendments
@@ -222,6 +231,9 @@ Automated, against a temporary database and archive built from `Samples/`:
 - 2026-11-16 (Approved): added "Empty reports".
   A no-production day loads with `record_count` 0 (Downtime, ToDate) or 4
   (Production Summary Totals) instead of failing.
+
+- 2026-11-18 (TASK-011): replaced version 1 and specified stable row IDs
+  for the SFPDataAPI hand-off.
 
 ## Open questions
 

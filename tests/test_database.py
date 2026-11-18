@@ -17,9 +17,13 @@ def seed(db):
 
 def test_schema(tmp_path):
     db = open_database(tmp_path / 'db')
-    assert db.execute('PRAGMA user_version').fetchone()[0] == CURRENT_VERSION == len(MIGRATIONS)
+    assert db.execute('PRAGMA user_version').fetchone()[0] == CURRENT_VERSION == len(MIGRATIONS) == 1
     assert {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")} == TABLES
     assert db.execute('PRAGMA foreign_keys').fetchone()[0] == 1
+    for table in TABLES:
+        first_column = db.execute(f'PRAGMA table_info({table})').fetchone()
+        assert first_column[1:3] == ('id', 'INTEGER')
+        assert first_column[5] == 1
     for table in TABLES - {'archived_file'}:
         assert len(db.execute(f'PRAGMA foreign_key_list({table})').fetchall()) == 1
     seed(db)
@@ -37,8 +41,8 @@ def test_schema(tmp_path):
     "INSERT INTO load_failure VALUES (1,999,'now','LayoutError','bad')",
     "INSERT INTO archived_file VALUES (2,'b','b','date','BAD',1,'now')",
     "INSERT INTO file_load VALUES (2,999,'bad','now','now',NULL,NULL,NULL,1,0)",
-    "INSERT INTO production_summary_breakdown VALUES (1,0,'invalid','x',0,NULL,NULL,NULL)",
-    "INSERT INTO production_summary_breakdown VALUES (1,0,'grade','x',2,NULL,NULL,NULL)",
+    "INSERT INTO production_summary_breakdown VALUES (NULL,1,0,'invalid','x',0,NULL,NULL,NULL)",
+    "INSERT INTO production_summary_breakdown VALUES (NULL,1,0,'grade','x',2,NULL,NULL,NULL)",
 ])
 def test_lineage_and_checks(tmp_path, statement):
     db = open_database(tmp_path / 'db')
@@ -58,16 +62,17 @@ def test_lineage_and_checks(tmp_path, statement):
 def test_report_uniques_foreign_keys_and_not_null(tmp_path, table, values):
     db = open_database(tmp_path / 'db')
     seed(db)
-    db.execute(f'INSERT INTO {table} VALUES ({values})')
+    db.execute(f'INSERT INTO {table} VALUES (NULL,{values})')
     with pytest.raises(sqlite3.IntegrityError):
-        db.execute(f'INSERT INTO {table} VALUES ({values})')
+        db.execute(f'INSERT INTO {table} VALUES (NULL,{values})')
     with pytest.raises(sqlite3.IntegrityError):
-        db.execute(f'INSERT INTO {table} VALUES (999,{values.split(",", 1)[1]})')
+        db.execute(f'INSERT INTO {table} VALUES (NULL,999,{values.split(",", 1)[1]})')
     with pytest.raises(sqlite3.IntegrityError):
-        db.execute(f'INSERT INTO {table} VALUES (NULL,{values.split(",", 1)[1]})')
+        db.execute(f'INSERT INTO {table} VALUES (NULL,NULL,{values.split(",", 1)[1]})')
     if table == 'production_todate_day':
         with pytest.raises(sqlite3.IntegrityError):
-            db.execute(f'INSERT INTO {table} VALUES ({values.replace("1,0,", "1,1,", 1)})')
+            db.execute(f'INSERT INTO {table} VALUES (NULL,{values.replace("1,0,", "1,1,", 1)})')
+    values = 'NULL,' + values
     # Every declared NOT NULL column rejects NULL independently.
     db.execute(f'DELETE FROM {table}')
     for column in db.execute(f'PRAGMA table_info({table})').fetchall():

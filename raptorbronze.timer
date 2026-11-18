@@ -1,0 +1,8 @@
+[Unit]
+Description=Run the Raptor reports bronze ETL on weekday nights
+
+[Timer]
+OnCalendar=Mon..Fri 23:00 America/Los_Angeles
+
+[Install]
+WantedBy=timers.target

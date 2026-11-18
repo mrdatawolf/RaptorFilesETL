@@ -2,7 +2,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import os
-import re
 import tempfile
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -10,32 +9,12 @@ from dotenv import load_dotenv
 
 from .errors import ConfigError
 
-DAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-
-
-def parse_days(value: str) -> tuple[int, ...]:
-    if "-" in value:
-        parts = value.split("-")
-        if len(parts) != 2 or any(p not in DAYS for p in parts):
-            raise ValueError
-        start, end = map(DAYS.index, parts)
-        if start > end:
-            raise ValueError
-        return tuple(range(start, end + 1))
-    parts = value.split(",")
-    if any(p not in DAYS for p in parts):
-        raise ValueError
-    return tuple(dict.fromkeys(DAYS.index(p) for p in parts))
-
-
 @dataclass(frozen=True)
 class Config:
     source_path: str
     archive_dir: Path
     db_path: Path
     timezone: ZoneInfo
-    run_time: str
-    run_days: tuple[int, ...]
     log_level: str
     smb_username: str | None = field(repr=False)
     smb_password: str | None = field(repr=False)
@@ -72,14 +51,6 @@ def load_config(env_file: str | Path = ".env", *, read_only: bool = False) -> Co
     except (ZoneInfoNotFoundError, ValueError):
         problems.append("RAPTOR_TIMEZONE: invalid IANA time zone")
         timezone = None
-    run_time = get("RUN_TIME", "23:00")
-    if not run_time or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", run_time):
-        problems.append("RAPTOR_RUN_TIME: expected HH:MM in 24-hour time")
-    try:
-        days = parse_days(get("RUN_DAYS", "MON-FRI") or "")
-    except ValueError:
-        problems.append("RAPTOR_RUN_DAYS: expected weekday range or comma list")
-        days = ()
     level = get("LOG_LEVEL", "INFO")
     if level not in ("DEBUG", "INFO", "WARNING", "ERROR"):
         problems.append("RAPTOR_LOG_LEVEL: expected DEBUG, INFO, WARNING or ERROR")
@@ -101,5 +72,5 @@ def load_config(env_file: str | Path = ".env", *, read_only: bool = False) -> Co
             problems.append("RAPTOR_DB_PATH: invalid database path")
     if problems:
         raise ConfigError(problems)
-    return Config(source, Path(archive), Path(database), timezone, run_time, days, level,
+    return Config(source, Path(archive), Path(database), timezone, level,
                   username, password, domain)

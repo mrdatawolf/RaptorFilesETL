@@ -25,7 +25,7 @@ def environment(tmp_path):
     archive = tmp_path / 'archive'
     archive.mkdir()
     config = Config(str(tmp_path), archive, tmp_path / 'bronze.db',
-                    ZoneInfo('America/Los_Angeles'), '23:00', (0,), 'INFO', None, None, None)
+                    ZoneInfo('America/Los_Angeles'), 'INFO', None, None, None)
     clock = Clock(config.timezone, lambda: datetime(2026, 11, 11, 7, 30, tzinfo=timezone.utc))
     db = open_database(config.db_path)
     yield config, db, clock
@@ -82,13 +82,15 @@ def test_sample_values_lineage_idempotency_and_append_only(samples, caplog):
         table, attr = load.MAIN_TABLES[kind]
         records = getattr(parsed, attr)
         assert metadata == [*astuple(parsed.header), parsed.page_count, len(records), '2026-11-10 23:30:00']
-        assert db.execute(f'SELECT * FROM {table} WHERE file_load_id=? ORDER BY row_order',
-                          (load_id,)).fetchall() == [(load_id, *astuple(record)) for record in records]
+        rows = db.execute(f'SELECT * FROM {table} WHERE file_load_id=? ORDER BY row_order',
+                          (load_id,)).fetchall()
+        assert [row[1:] for row in rows] == [(load_id, *astuple(record)) for record in records]
         for header_table, record in (('downtime_total', parsed.grand_total),
                                      ('production_summary_kpi', parsed.kpis)):
             if record is not None:
-                assert db.execute(f'SELECT * FROM {header_table} WHERE file_load_id=?',
-                                  (load_id,)).fetchall() == [(load_id, *astuple(record))]
+                rows = db.execute(f'SELECT * FROM {header_table} WHERE file_load_id=?',
+                                  (load_id,)).fetchall()
+                assert [row[1:] for row in rows] == [(load_id, *astuple(record))]
     assert load.load_stage(config, db, clock)
     assert counts(db) == result
     assert caplog.text.count(': loaded record_count=') == 3
@@ -214,12 +216,14 @@ def test_schema_version_and_constraints(samples):
     assert db.execute('PRAGMA foreign_keys').fetchone()[0] == 1
     assert load.load_stage(config, db, clock)
     for table in ('file_load', *REPORT_TABLES):
+        columns = ', '.join(row[1] for row in db.execute(f'PRAGMA table_info({table})')
+                            if row[1] != 'id')
         with pytest.raises(sqlite3.IntegrityError), db:
-            db.execute(f'INSERT INTO {table} SELECT * FROM {table} LIMIT 1')
+            db.execute(f'INSERT INTO {table} ({columns}) SELECT {columns} FROM {table} LIMIT 1')
     with pytest.raises(sqlite3.IntegrityError), db:
-        db.execute("INSERT INTO downtime_total VALUES (999999, 1, '00:00:01')")
+        db.execute("INSERT INTO downtime_total VALUES (NULL, 999999, 1, '00:00:01')")
     with pytest.raises(sqlite3.IntegrityError), db:
-        db.execute('INSERT INTO production_todate_day SELECT file_load_id, row_order+1000, '
+        db.execute('INSERT INTO production_todate_day SELECT NULL, file_load_id, row_order+1000, '
                    'run_start, fast_pct, medium_pct, slow_pct, lug_fill, bf_per_piece, '
                    'trimloss, total_stops, downtime, volume FROM production_todate_day LIMIT 1')
 

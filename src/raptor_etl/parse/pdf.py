@@ -42,7 +42,7 @@ class Word:
 
 
 def read_pages(path, file):
-    import pdfplumber  # Imported here so run/schedule/check never load it (ADR-002).
+    import pdfplumber  # Imported here so run/check never load it (ADR-002).
 
     try:
         with pdfplumber.open(path) as pdf:

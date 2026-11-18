@@ -15,7 +15,7 @@ for later analysis.
 
 - Owner and operator: the human project lead.
 - Data source: Raptor Integration Inc. reporting (Crystal Reports exports).
-- Consumers of the bronze data: to be defined.
+- Consumer of the bronze data: the SFPDataAPI `trimmer` source.
 
 ## Desired outcomes
 
@@ -76,18 +76,17 @@ The report's own dates come from Report Start/End, not from the copy date.
   project. Working assumption for the path: `//test/files` (it must be
   configurable). The share holds only the current day's files, named exactly
   as in `Samples/`.
-- The job must run on either Linux or Windows and is expected to run in a
-  Docker container, deployed as a TrueNAS custom app.
+- The job must run on either Linux or Windows in a Python virtual environment.
+  On Linux, a systemd timer starts the job and the start script delivers a
+  SQLite snapshot named `trimmer.db`. On Windows, `start.bat` runs the ETL
+  against the local database.
 - All configuration and secrets are read from **environment variables**:
   share location, SMB username and password, archive path, database path, and
-  similar settings. Locally these come from a `.env` file, which is never
-  committed. In Docker they are set in the TrueNAS custom app's environment
-  settings. No settings or secrets are hard-coded or stored in the repository.
+  similar settings. Operators set them in a gitignored `.env` file.
 - The archive is written to a configurable folder, chosen at deployment.
   Archived files are kept **forever**.
 - The copy runs at 23:00 **plant local time** (Pacific), hours after the last
-  production run, so each file is a complete day. Containers default to UTC,
-  so the time zone must be set explicitly.
+  production run, so each file is a complete day. The timer uses `America/Los_Angeles`.
 - Source filenames are the same every day.
 - If a run is delayed past midnight, the copy date shifts by a day. This is
   acceptable as long as the system is consistent: the copy date is always the

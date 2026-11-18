@@ -30,7 +30,7 @@ def setup(tmp_path, make_share):
     archive = tmp_path / 'archive'
     archive.mkdir()
     config = Config(str(source), archive, tmp_path / 'bronze.db',
-                    ZoneInfo('America/Los_Angeles'), '23:00', (0,), 'INFO', None, None, None)
+                    ZoneInfo('America/Los_Angeles'), 'INFO', None, None, None)
     database = open_database(config.db_path)
     clock = Clock(config.timezone, lambda: datetime(2026, 11, 11, 7, 30, tzinfo=timezone.utc))
 

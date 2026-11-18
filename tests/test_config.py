@@ -15,8 +15,7 @@ def test_all_errors_no_secrets(configured, monkeypatch, capsys):
     values = {'SOURCE_PATH': '//host/share', 'SMB_PASSWORD': 'secret-canary',
               'ARCHIVE_DIR': str(configured / 'missing'),
               'DB_PATH': str(configured / 'missing' / 'db'),
-              'TIMEZONE': 'bad-zone', 'RUN_TIME': '24:00',
-              'RUN_DAYS': 'BAD', 'LOG_LEVEL': 'secret-canary'}
+              'TIMEZONE': 'bad-zone', 'LOG_LEVEL': 'secret-canary'}
     for key, value in values.items():
         monkeypatch.setenv('RAPTOR_' + key, value)
     with pytest.raises(ConfigError) as error:
@@ -26,7 +25,7 @@ def test_all_errors_no_secrets(configured, monkeypatch, capsys):
     output = capsys.readouterr()
     assert not output.err
     assert 'secret-canary' not in output.out
-    for name in ('SMB_USERNAME', 'ARCHIVE_DIR', 'DB_PATH', 'TIMEZONE', 'RUN_TIME', 'RUN_DAYS', 'LOG_LEVEL'):
+    for name in ('SMB_USERNAME', 'ARCHIVE_DIR', 'DB_PATH', 'TIMEZONE', 'LOG_LEVEL'):
         assert 'RAPTOR_' + name in output.out
 
 
@@ -39,16 +38,14 @@ def test_missing_required(configured, monkeypatch):
 
 
 def test_env_override_defaults_and_secret_repr(configured, monkeypatch):
-    (configured / '.env').write_text('RAPTOR_SOURCE_PATH=from-file\nRAPTOR_RUN_TIME=12:34\nRAPTOR_SMB_PASSWORD=hidden\n')
+    (configured / '.env').write_text('RAPTOR_SOURCE_PATH=from-file\nRAPTOR_SMB_PASSWORD=hidden\n')
     config = load_config()
     assert config.source_path == str(configured / 'source')
-    assert config.run_time == '12:34'
     assert config.timezone.key == 'America/Los_Angeles'
-    assert config.run_days == (0, 1, 2, 3, 4)
     assert 'hidden' not in repr(config)
 
 
-@pytest.mark.parametrize('name,value', [('RUN_DAYS', 'FRI-MON'), ('RUN_DAYS', 'MON,,TUE'), ('RUN_TIME', '1:00'), ('SOURCE_PATH', '//host'), ('TIMEZONE', ''), ('SMB_DOMAIN', '')])
+@pytest.mark.parametrize('name,value', [('SOURCE_PATH', '//host'), ('TIMEZONE', ''), ('SMB_DOMAIN', '')])
 def test_invalid_values(configured, monkeypatch, name, value):
     monkeypatch.setenv('RAPTOR_' + name, value)
     with pytest.raises(ConfigError):
