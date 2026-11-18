@@ -19,8 +19,8 @@ for later analysis.
 
 ## Desired outcomes
 
-- Every daily report file is copied to an archive with the copy date in its
-  filename, and the copy is byte-identical to the source.
+- Every daily data report (`.xls`) is copied to an archive with the copy
+  date in its filename, and the copy is byte-identical to the source.
 - The data in each supported report is loaded into bronze with as little
   transformation as possible, and each row can be traced to its source file.
 - Running the job again on the same file never creates duplicate data.
@@ -29,8 +29,9 @@ for later analysis.
 
 ### Included
 
-- A copy at **23:00, Monday to Friday**, of the `.pdf` and `.xls` report files
-  from the SMB share. Files are **copied**; the share is never modified. There
+- A copy at **23:00, Monday to Friday**, of the three data `.xls` reports
+  (Downtime Summary, Production Summary, Production ToDate) from the SMB
+  share. Files are **copied**; the share is never modified. There
   is no production on weekends, so no weekend runs are scheduled.
 - Weekdays with no production: the share still holds the previous run's files.
   The hash check finds them unchanged and skips them, so they are neither
@@ -49,23 +50,25 @@ for later analysis.
 - Any change to files on the SMB share.
 - Other file types on the share.
 - Silver/gold layers: deduplicating across days, business modelling, reporting.
-- Parsing `.pdf` files in the nightly run. They are archived only, because
-  each one duplicates its `.xls`. The only exception is the manual backfill
-  above.
-- Thickness Breakdown data. The report is only a chart and has no useful data
-  for this project. Its files are archived but not parsed.
+- Any `.pdf` handling in the nightly run. The share's PDFs are not copied,
+  checked or parsed, because each one duplicates its `.xls`. PDFs enter the
+  archive and bronze only through the manual backfill above, usually from
+  copies distributed outside the share. This is never automated.
+- Thickness Breakdown. The report is only a chart and has no useful data for
+  this project. Neither its `.pdf` nor its `.xls` is copied or parsed.
 
 ## Source reports
 
 Each report is exported in both formats with the same content. The `.xls` has
-full precision and exact timestamps, so it is the parse source.
+full precision and exact timestamps, so it is the only format the nightly run
+uses.
 
 | Report | Contents | Bronze source |
 |---|---|---|
 | Downtime Summary | Per-alarm ID, description, occurrences, total/min/max duration | `.xls` |
 | Production Summary | Header KPIs; volume by product, length and grade | `.xls` |
 | Production ToDate | One row per production day (rolling multi-week history) | `.xls` |
-| Thickness Breakdown | Chart only; the `.xls` contains no data cells | Not parsed (archive only) |
+| Thickness Breakdown | Chart only; the `.xls` contains no data cells | Not collected |
 
 Each report header has Printed, Report Start, Report End and Recipe fields.
 The report's own dates come from Report Start/End, not from the copy date.

@@ -2,11 +2,13 @@
 
 1. **Share → archive.** Raptor writes daily Crystal Reports exports to a
    read-only SMB share. `raptor-etl run` reads the share directly through
-   smbprotocol and archives date-stamped, byte-identical copies (CONTRACT-001).
+   smbprotocol and archives date-stamped, byte-identical copies of the three
+   data `.xls` reports. PDFs and Thickness Breakdown are ignored
+   (CONTRACT-001).
 2. **Archive → bronze.** The ETL parses supported archived `.xls` reports
    (CONTRACT-002) and writes each report and its lineage in one SQLite
-   transaction (CONTRACT-003). An operator can backfill eligible days from
-   PDFs (CONTRACT-004).
+   transaction (CONTRACT-003). In an emergency, an operator can backfill
+   days with no `.xls` load by running `import-pdf` by hand (CONTRACT-004).
 3. **Bronze → push.** The Linux systemd timer launches the oneshot service
    at 23:00 Pacific on weekdays. With push enabled, `start.sh` takes a
    SQLite backup snapshot after a successful or partial run and rsyncs it

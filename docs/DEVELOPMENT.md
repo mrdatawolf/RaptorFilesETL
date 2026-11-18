@@ -89,15 +89,15 @@ problem is logged and the process exits with code 2.
 - Each contract's "Validation requirements" section is the minimum test list
   for that stage.
 - `Samples/` holds real reports (gitignored, local only) in this layout:
-  `Samples/XLS/<MM_DD_YYYY>/` (the four share `.xls` files) and
+  `Samples/XLS/<MM_DD_YYYY>/` (the share's `.xls` files) and
   `Samples/PDF/<MM_DD_YYYY>/` (hand-downloaded PDFs, lowercase names, no
   Downtime Summary). Folder names are not report dates: `XLS/11_11_2026`
   holds reports printed 2026-11-13. Tests that need a missing sample skip
   with a message naming it.
 - The reference day is `XLS/11_09_2026` and `PDF/11_09_2026`. The
-  `make_share` fixture (`tests/conftest.py`) builds the 8 CONTRACT-001 share
-  files from it, renaming the PDFs to the share's spelling and writing a
-  stand-in `Downtime Summary.pdf` (collect never reads PDF content).
+  `make_share` fixture (`tests/conftest.py`) builds the 3 CONTRACT-001 share
+  files from `XLS/<day>`. With `non_data=True` it also writes stand-in PDF
+  and Thickness Breakdown files, which collect and check must ignore.
 - Tests run offline against a local source folder. SMB is tested by hand
   against the real share before deployment.
 - Time-dependent behavior (copy date) is tested with an injected
@@ -125,7 +125,7 @@ raptor-etl check
 
 Each result says `INFO OK` or `ERROR FAIL` with a reason. Successful checks
 use INFO (visible by default); failures use ERROR. Source failures include the
-host/share or local path and the username where relevant, with passwords scrubbed. Every expected file is fully
+host/share or local path and the username where relevant, with passwords scrubbed. Each of the 3 expected `.xls` files is fully
 read and reports its byte size and SHA-256. A missing database says "will be
 created on first run" and is left absent; existing databases are inspected
 without migration. The check takes no run lock and writes no files.
@@ -175,7 +175,10 @@ run `start.bat` to build the local database.
 `raptor-etl import-pdf <folder>` loads Production Summary and Production
 ToDate reports from their PDF exports, for days that have no `.xls` load
 (CONTRACT-004). Use it only when the `.xls` files for those days are gone.
-It runs against the local archive and database.
+It runs against the local archive and database. It is never run
+automatically; the nightly run ignores PDFs (CONTRACT-001). To backfill one
+day, put that day's PDFs in a folder of their own and point the command at
+it.
 
 - The folder is searched recursively. File names are matched ignoring case
   (`production summary.pdf`, `Production Todate.pdf`). Thickness Breakdown,

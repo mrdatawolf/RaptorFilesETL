@@ -1,7 +1,7 @@
 # TASK-012: Nightly run collects only the three data `.xls` reports
 
 Owner role: implementer
-Assigned agent:
+Assigned agent: Claude (main session)
 Proposed by: Claude (main session)
 Proposed date: 2026-11-18
 Approved by: Patrick
@@ -158,7 +158,77 @@ None.
 
 ## Implementation handoff
 
-Not started.
+Task: TASK-012
+Implementer: Claude (main session)
+Date: 2026-11-18
+
+### Changes made
+
+- `src/raptor_etl/collect.py`: `EXPECTED_FILES` holds only the 3 data
+  `.xls` names. `collect` and `check` both iterate this tuple, so neither
+  reads, copies nor reports `.pdf` or Thickness Breakdown files any more.
+  Its `@ensure` postconditions follow automatically.
+- Load: no change. Its `original_name IN (3 .xls names)` filter is kept
+  because it still keeps PDF rows written by `import-pdf` out of `run`.
+- `import-pdf`, the PDF parser and pdfplumber: untouched.
+- `tests/conftest.py`: `make_share` builds the 3 `.xls` files from
+  `Samples/XLS/<xls_day>`. The `pdf_day` parameter and the Downtime PDF
+  stand-in are gone. New `non_data=True` writes stand-ins for the 5 files
+  the share also holds (`NON_DATA_FILES`).
+- Tests: counts 8 → 3 (collect, e2e, check). The injected database-fault
+  trigger now names `Downtime Summary.xls`. The SMB mock's listing and the
+  `check` test's listing now also contain the non-data names.
+- New test `test_pdf_and_thickness_breakdown_are_ignored`: run against a
+  source holding all 8 old files exits 0, archives and records only the
+  3 `.xls`, logs none of the 5 others, and leaves the source unchanged.
+- Docs: CONTRACT-001 (expected files, ignored files, validation list,
+  amendment), wording in CONTRACT-002 and CONTRACT-003, PROJECT.md scope
+  and source-reports table, ARCHITECTURE.md steps 1–2, DEVELOPMENT.md
+  (samples and `make_share`, `check`, how to backfill one day).
+
+### Validation performed
+
+- Full suite: **328 passed**, 0 failed, 0 skipped. Before the change:
+  327 tests, of which 17 failed once `EXPECTED_FILES` changed and were
+  then updated; plus 1 new test.
+- Local database rebuilt from scratch: `Data/raptor.db` and
+  `Samples/Archive/*` deleted. Then `collect` + `load` for XLS `11_09`,
+  `11_11`, `11_16` and `11_17` with injected 23:00 clocks (copy dates
+  11-09, 11-13, 11-16, 11-17), then `import-pdf Samples/PDF`. Overall
+  exit 0 (previously 1, from the 8 "missing" PDFs per run).
+
+### Acceptance criteria evidence
+
+- CONTRACT-001 lists exactly 3 `.xls` files and says the rest are
+  ignored.
+- Run against all 8 old files: only the 3 archived and loaded, nothing
+  logged about the others: the new test.
+- Run against only the 3 `.xls` exits 0:
+  `test_cli_success_and_load_visibility` and the e2e tests.
+- A missing `.xls` still gives `missing` and exit 1:
+  `test_missing_case_sensitive_ignored_and_exit`.
+- `check` reports 7 lines (4 precheck + 3 files) and exits 0 with no
+  PDFs; it does not mention non-data files even when they are listed:
+  `test_check_ok_info_fail_error_visible_default`.
+- `import-pdf` tests pass with no changes to `tests/test_import_pdf.py`.
+- No document still describes the nightly run as copying PDFs or
+  Thickness Breakdown (grep of `docs/`, `src/` and `AGENTS.md`).
+  ADR-001's "8 files" remark is historical and was left alone.
+- Rebuilt database: `load_failure` empty. `archived_file` contains 12 `.xls` rows (3 per
+  day) and 4 `.pdf` rows, which are 2026-11-10 and 2026-11-11 Production Summary and Todate, all
+  from `import-pdf`. There are no Thickness Breakdown rows. Per day: 11-09 20/34/81,
+  11-10 –/30/81 (PDF), 11-11 –/35/81 (PDF), 11-13 0/4/80,
+  11-16 19/42/80, 11-17 19/45/80.
+
+### Assumptions and deviations
+
+- Plan step 1 asked for the contract amendment to be approved before
+  code. The amendment text was fully specified in this approved task, so
+  it was written together with the code. Its amendment entry says
+  "approved with the task, confirm at acceptance". Please confirm it when
+  accepting.
+- The rebuild script was a scratchpad helper with an injected clock. It
+  is not part of the repository.
 
 ## Review
 

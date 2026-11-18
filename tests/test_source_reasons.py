@@ -13,6 +13,8 @@ from smbprotocol import exceptions as smb_errors
 from raptor_etl import cli, source
 from raptor_etl.clock import Clock
 from raptor_etl.collect import EXPECTED_FILES, collect
+
+from conftest import NON_DATA_FILES
 from raptor_etl.config import load_config
 from raptor_etl.database import open_database
 from raptor_etl.precheck import precheck
@@ -329,12 +331,15 @@ def test_context_scrubs_password_in_path_and_username(remote, secret):
 
 def test_check_ok_info_fail_error_visible_default(remote, capsys):
     config, client = remote
+    # The share also holds PDFs and Thickness Breakdown; check ignores them.
+    client.listdir.return_value = [*EXPECTED_FILES, *NON_DATA_FILES]
     assert cli.main(['check']) == 0
     lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 12
+    assert len(lines) == 7
     assert all(line.startswith('INFO OK ') for line in lines)
+    assert not any(name in line for line in lines for name in NON_DATA_FILES)
     client.listdir.return_value = []
     assert cli.main(['check']) == 1
     lines = capsys.readouterr().out.splitlines()
-    assert sum(line.startswith('ERROR FAIL ') for line in lines) == 8
+    assert sum(line.startswith('ERROR FAIL ') for line in lines) == 3
     assert not any(line.startswith('WARNING') for line in lines)

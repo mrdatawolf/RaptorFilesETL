@@ -10,9 +10,9 @@ from .errors import ArchiveIntegrityError
 from .precheck import precheck
 from .source import scrub_password, source_error
 
-EXPECTED_FILES = tuple(f'{report}.{extension}' for report in (
-    'Downtime Summary', 'Production Summary', 'Production Todate', 'Thickness Breakdown'
-) for extension in ('pdf', 'xls'))
+# Only the data reports. PDFs and Thickness Breakdown on the share are ignored;
+# PDFs enter only through the manual import-pdf backfill (CONTRACT-004).
+EXPECTED_FILES = ('Downtime Summary.xls', 'Production Summary.xls', 'Production Todate.xls')
 CHUNK_SIZE = 1024 * 1024
 
 

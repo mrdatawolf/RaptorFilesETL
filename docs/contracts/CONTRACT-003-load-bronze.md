@@ -139,9 +139,9 @@ Foreign keys are enabled on every connection.
 
    This includes files archived in earlier runs whose load failed, so
    failures are retried automatically on every run that passes the
-   CONTRACT-001 precheck. PDFs and Thickness
-   Breakdown are never selected (PDFs are loaded only by the manual
-   backfill, CONTRACT-004). They are processed in `archived_at` order,
+   CONTRACT-001 precheck. Archived PDFs exist only from the manual
+   backfill (CONTRACT-004), which loads them itself; they are never
+   selected here. They are processed in `archived_at` order,
    oldest first.
 2. **For each file:**
    1. Recalculate the archive file's SHA-256. If it doesn't match
@@ -220,8 +220,9 @@ Automated, against a temporary database and archive built from `Samples/`:
 - A tampered archive file → `ArchiveIntegrityError`.
 - The 2026-11-13 sample `.xls` set (all three types) loads with exit
   code 0 and the rows listed under "Empty reports".
-- PDFs and Thickness Breakdown are never loaded by `run`. PDF loads by the
-  manual backfill are defined in CONTRACT-004.
+- PDFs are never loaded by `run`, even when the manual backfill has
+  archived them. PDF loads by the manual backfill are defined in
+  CONTRACT-004.
 - Foreign keys are enforced, and the unique constraints reject duplicates.
 - Schema version: a new database is created at version 1 with a declared `id INTEGER PRIMARY KEY` in every table, and a
   database with a newer version fails with exit code 2.

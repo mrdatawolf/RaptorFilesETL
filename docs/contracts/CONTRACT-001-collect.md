@@ -3,13 +3,14 @@
 Status: Approved
 Approved by: Patrick
 Approved date: 2026-11-11
-Related tasks: TASK-001
+Related tasks: TASK-001, TASK-012
 Related ADRs: ADR-001
 
 ## Purpose
 
-Keep an unaltered, dated copy of each day's Raptor report files before the
-source share overwrites them, and never archive the same content twice.
+Keep an unaltered, dated copy of each day's Raptor data reports (`.xls`)
+before the source share overwrites them, and never archive the same content
+twice.
 
 ## Scope
 
@@ -34,18 +35,21 @@ source share overwrites them, and never archive the same content twice.
 
 ## Inputs and outputs
 
-**Input: the expected files.** Exactly these 8 names, in the source folder
+**Input: the expected files.** Exactly these 3 names, in the source folder
 root, matched case-sensitively:
 
 | Original name | Report type |
 |---|---|
-| `Downtime Summary.pdf` / `.xls` | Downtime Summary |
-| `Production Summary.pdf` / `.xls` | Production Summary |
-| `Production Todate.pdf` / `.xls` | Production ToDate |
-| `Thickness Breakdown.pdf` / `.xls` | Thickness Breakdown (archived only) |
+| `Downtime Summary.xls` | Downtime Summary |
+| `Production Summary.xls` | Production Summary |
+| `Production Todate.xls` | Production ToDate |
 
-Any other file in the source folder is ignored and not logged. Changing this
-list requires changing this contract.
+Any other file in the source folder is ignored and not logged. This includes
+every `.pdf` file and both Thickness Breakdown files. They are never read,
+copied, archived or reported, and they do not affect the exit code. PDFs
+enter the archive and database only through the manual `raptor-etl
+import-pdf` (CONTRACT-004). Changing this list requires changing this
+contract.
 
 **Outputs:**
 
@@ -145,9 +149,13 @@ The SMB password never appears in logs or error messages.
 
 Automated tests against a local source folder holding copies of `Samples/`:
 
-- A first run archives all 8 files with correct names and matching hashes.
-- A second run with identical source files → all 8 `unchanged`, no new
+- A first run archives all 3 files with correct names and matching hashes.
+- A second run with identical source files → all 3 `unchanged`, no new
   archive files or records.
+- `.pdf` and Thickness Breakdown files in the source are ignored: not
+  archived, not recorded, not logged, and the run exits 0 when all 3
+  expected files are archived or unchanged. `raptor-etl check` does not
+  report them either.
 - One changed source file → only that file is `archived`.
 - A missing source file → `missing` and exit code 1, while the others are
   archived.
@@ -175,6 +183,12 @@ Manual: one run against the real SMB share before deployment.
   the same precheck run everywhere, by hand with `raptor-etl check` and
   automatically at the start of every run. Comparing a test box with the
   container then shows whether a problem is the share or the container.
+- 2026-11-18 (TASK-012; approved by Patrick): the
+  expected files are now only the 3 data `.xls` reports. The `.pdf` exports
+  and both Thickness Breakdown files are no longer collected or checked. The PDFs duplicate the `.xls`,
+  and emergency backfills use PDFs obtained outside the share. Thickness
+  Breakdown holds no data. A missing PDF or Thickness Breakdown file
+  therefore no longer gives exit code 1.
 
 ## Open questions
 

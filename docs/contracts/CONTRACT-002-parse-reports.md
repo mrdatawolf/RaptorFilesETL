@@ -25,7 +25,8 @@ is a pure step: it reads a file and returns data, with no other side effects.
 ### Excluded
 
 - `.pdf` files and Thickness Breakdown. They are never parsed by this
-  contract. PDF parsing for the manual backfill is defined in CONTRACT-004.
+  contract, and the nightly run no longer collects them (CONTRACT-001). PDF
+  parsing for the manual backfill is defined in CONTRACT-004.
 - Deduplicating, aggregating, renaming business terms, or converting units.
 - Writing to the database (CONTRACT-003).
 
@@ -216,7 +217,8 @@ sections).
   caller (CONTRACT-003) records the failure, loads nothing from that file and
   keeps processing other files.
 - If the expected type isn't one of the three, the parser is never called.
-  The load stage excludes PDFs and Thickness Breakdown before parsing.
+  The load stage selects only the three `.xls` names, so PDFs archived by
+  the manual backfill are never passed to this parser.
 
 ## Interfaces
 

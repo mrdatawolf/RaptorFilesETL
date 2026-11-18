@@ -33,7 +33,7 @@ def test_first_and_second_run(sample_run):
     assert cli.main(['run']) == 0
     with sqlite3.connect(sample_run / 'bronze.db') as db:
         first = counts(db)
-        assert first == dict(zip(TABLES, (8, 3, 0, 20, 1, 1, 34, 81)))
+        assert first == dict(zip(TABLES, (3, 3, 0, 20, 1, 1, 34, 81)))
         assert dict(db.execute('SELECT report_type, record_count FROM file_load')) == {
             'downtime_summary': 20, 'production_summary': 34, 'production_todate': 81}
         assert dict(db.execute('SELECT section, COUNT(*) FROM production_summary_breakdown '
@@ -82,7 +82,7 @@ def test_corrupt_archive_load_fails_after_successful_collect(sample_run, monkeyp
     assert cli.main(['run']) == 1
     assert collected == [True]
     with sqlite3.connect(sample_run / 'bronze.db') as db:
-        assert counts(db) == dict(zip(TABLES, (8, 2, 1, 0, 0, 1, 34, 81)))
+        assert counts(db) == dict(zip(TABLES, (3, 2, 1, 0, 0, 1, 34, 81)))
         assert db.execute('SELECT error_type FROM load_failure').fetchall() == [
             ('ArchiveIntegrityError',)]
         assert set(dict(db.execute('SELECT report_type, record_count FROM file_load'))) == {
@@ -91,7 +91,7 @@ def test_corrupt_archive_load_fails_after_successful_collect(sample_run, monkeyp
 
 def test_empty_day_run_loads_empty_reports(configured, monkeypatch, make_share):
     """CONTRACT-003 "Empty reports": the 2026-11-13 no-production day (XLS/11_11_2026)."""
-    make_share(configured / 'source', xls_day='11_11_2026', pdf_day='11_13_2026')
+    make_share(configured / 'source', xls_day='11_11_2026')
     archive = configured / 'archive'
     archive.mkdir()
     monkeypatch.setenv('RAPTOR_ARCHIVE_DIR', str(archive))
@@ -101,7 +101,7 @@ def test_empty_day_run_loads_empty_reports(configured, monkeypatch, make_share):
     with sqlite3.connect(configured / 'bronze.db') as db:
         assert dict(db.execute('SELECT report_type, record_count FROM file_load')) == {
             'downtime_summary': 0, 'production_summary': 4, 'production_todate': 80}
-        assert counts(db) == dict(zip(TABLES, (8, 3, 0, 0, 1, 1, 4, 80)))
+        assert counts(db) == dict(zip(TABLES, (3, 3, 0, 0, 1, 1, 4, 80)))
         assert db.execute('SELECT occurrences, total_duration FROM downtime_total').fetchall() == [(0, None)]
         assert db.execute('SELECT section, label, is_total, pieces FROM production_summary_breakdown '
                           'ORDER BY row_order').fetchall() == [
